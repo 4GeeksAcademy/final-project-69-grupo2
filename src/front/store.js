@@ -1,6 +1,7 @@
 export const initialStore=()=>{
   return{
     message: null,
+     complejos: [],
     todos: [
       {
         id: 1,
@@ -22,6 +23,21 @@ export default function storeReducer(store, action = {}) {
       return {
         ...store,
         message: action.payload
+      };
+        case 'set_complejos':
+      return {
+        ...store,
+        complejos: action.payload
+      };
+    case 'add_complejo':
+      return {
+        ...store,
+        complejos: [...store.complejos, action.payload]
+      };
+    case 'delete_complejo':
+      return {
+        ...store,
+        complejos: store.complejos.filter(c => c.id !== action.payload)
       };
       
     case 'add_task':

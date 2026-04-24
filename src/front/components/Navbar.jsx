@@ -27,12 +27,17 @@ export const Navbar = () => {
 				</Link>
 
 				<div className="d-flex align-items-center gap-3 ms-auto">
+
+
 					<Link className="nav-link text-white" to="/">Inicio</Link>
 					<Link className="nav-link text-white" to="/">Actividades</Link>
 					<Link className="nav-link text-white" to="/reservas">Reservas</Link>
 					<Link className="nav-link text-white" to="/">Eventos</Link>
 					<Link className="nav-link text-white" to="/registro">Registro</Link>
+					<Link className="nav-link text-white" to="/add-complejo">
 
+						<i className="fa fa-plus me-1"></i> Añadir Complejo
+					</Link>
 					<div className="dropdown">
 						<button
 							className="btn nav-link text-white dropdown-toggle"
