@@ -27,23 +27,36 @@ class Categoria(db.Model):
         return {"id": self.id, "nombre": self.nombre}
 
 
+
 class Complejo(db.Model):
     id: Mapped[int] = mapped_column(primary_key=True)
     nombre: Mapped[str] = mapped_column(String(120), nullable=False)
+    email: Mapped[str] = mapped_column(String(120), nullable=True) 
+    phone: Mapped[str] = mapped_column(String(20), nullable=True)  
+    address: Mapped[str] = mapped_column(String(200), nullable=True) 
+    country: Mapped[str] = mapped_column(String(80), nullable=True)  
+    city: Mapped[str] = mapped_column(String(80), nullable=True)     
+    google_map: Mapped[str] = mapped_column(String(500), nullable=True) 
     imagen_url: Mapped[str] = mapped_column(String(300), nullable=True)
-    categoria_id: Mapped[int] = mapped_column(
-        db.ForeignKey("categoria.id"), nullable=False)
+    
+    categoria_id: Mapped[int] = mapped_column(db.ForeignKey("categoria.id"), nullable=True)
     categoria: Mapped["Categoria"] = relationship(back_populates="complejos")
     canchas: Mapped[list["Cancha"]] = relationship(back_populates="complejo")
+
 
     def serialize(self):
         return {
             "id": self.id,
-            "nombre": self.nombre,
+            "name": self.nombre,
+            "email": self.email,
+            "phone": self.phone,
+            "address": self.address,
+            "country": self.country,
+            "city": self.city,
+            "google_map": self.google_map,
             "imagen_url": self.imagen_url,
-            "categoria": self.categoria.nombre
+            "categoria": self.categoria.nombre if self.categoria else "Sin categoría"
         }
-
 
 class Cancha(db.Model):
     id: Mapped[int] = mapped_column(primary_key=True)

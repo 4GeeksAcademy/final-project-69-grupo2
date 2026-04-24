@@ -23,6 +23,11 @@ useEffect(() => {
 				<div className="d-flex align-items-center gap-3 ms-auto">
 					<Link className="nav-link" to="/">Inicio</Link>
 					<Link className="nav-link" to="/registro">Registro</Link>
+					    <Link to="/add-complejo">
+                        <button className="btn btn-success btn-sm">
+                            <i className="fa fa-plus me-1"></i> Añadir Complejo
+                        </button>
+                    </Link>
 
 					<div className="dropdown">
 						<button
