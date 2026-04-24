@@ -15,12 +15,16 @@ from flask_jwt_extended import JWTManager
 # from models import Person
 
 ENV = "development" if os.getenv("FLASK_DEBUG") == "1" else "production"
-static_file_dir = os.path.join(os.path.dirname(
-    os.path.realpath(__file__)), '../dist/')
+
+static_file_dir = os.path.join(
+    os.path.dirname(os.path.realpath(__file__)), '../dist/'
+)
+
 app = Flask(__name__)
+
 app.url_map.strict_slashes = False
 
-# database condiguration
+# database configuration
 db_url = os.getenv("DATABASE_URL")
 if db_url is not None:
     app.config['SQLALCHEMY_DATABASE_URI'] = db_url.replace(
@@ -29,6 +33,7 @@ else:
     app.config['SQLALCHEMY_DATABASE_URI'] = "sqlite:////tmp/test.db"
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
 MIGRATE = Migrate(app, db, compare_type=True)
 db.init_app(app)
 
@@ -40,10 +45,10 @@ jwt = JWTManager(app)
 # add the admin
 setup_admin(app)
 
-# add the admin
+# add commands
 setup_commands(app)
 
-# Add all endpoints form the API with a "api" prefix
+# Add all endpoints from the API with a "api" prefix
 app.register_blueprint(api, url_prefix='/api')
 
 # Handle/serialize errors like a JSON object
@@ -74,7 +79,7 @@ def serve_any_other_file(path):
     return response
 
 
-# this only runs if `$ python src/main.py` is executed
+# run server
 if __name__ == '__main__':
     PORT = int(os.environ.get('PORT', 3001))
     app.run(host='0.0.0.0', port=PORT, debug=True)

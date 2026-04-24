@@ -1,9 +1,10 @@
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import String, Boolean, DateTime, func
-from sqlalchemy.orm import Mapped, mapped_column
 from datetime import datetime
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 db = SQLAlchemy()
+
 
 class User(db.Model):
     __tablename__ = "users"
@@ -23,10 +24,52 @@ class User(db.Model):
         DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     def serialize(self):
+        return {"id": self.id,
+                "username": self.username,
+                "email": self.email,
+                "is_active": self.is_active
+                }
+
+
+class Categoria(db.Model):
+    id: Mapped[int] = mapped_column(primary_key=True)
+    nombre: Mapped[str] = mapped_column(
+        String(100), nullable=False, unique=True)
+    complejos: Mapped[list["Complejo"]] = relationship(
+        back_populates="categoria")
+
+    def serialize(self):
+        return {"id": self.id, "nombre": self.nombre}
+
+
+class Complejo(db.Model):
+    id: Mapped[int] = mapped_column(primary_key=True)
+    nombre: Mapped[str] = mapped_column(String(120), nullable=False)
+    imagen_url: Mapped[str] = mapped_column(String(300), nullable=True)
+    categoria_id: Mapped[int] = mapped_column(
+        db.ForeignKey("categoria.id"), nullable=False)
+    categoria: Mapped["Categoria"] = relationship(back_populates="complejos")
+    canchas: Mapped[list["Cancha"]] = relationship(back_populates="complejo")
+
+    def serialize(self):
         return {
             "id": self.id,
-            "username": self.username,
-            "email": self.email,
-            "is_active": self.is_active,
-            # do not serialize the password, its a security breach
+            "nombre": self.nombre,
+            "imagen_url": self.imagen_url,
+            "categoria": self.categoria.nombre
+        }
+
+
+class Cancha(db.Model):
+    id: Mapped[int] = mapped_column(primary_key=True)
+    nombre: Mapped[str] = mapped_column(String(120), nullable=False)
+    complejo_id: Mapped[int] = mapped_column(
+        db.ForeignKey("complejo.id"), nullable=False)
+    complejo: Mapped["Complejo"] = relationship(back_populates="canchas")
+
+    def serialize(self):
+        return {
+            "id": self.id,
+            "nombre": self.nombre,
+            "complejo_id": self.complejo_id
         }

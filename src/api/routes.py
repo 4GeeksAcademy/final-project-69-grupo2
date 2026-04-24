@@ -3,8 +3,8 @@ This module takes care of starting the API Server, Loading the DB and Adding the
 """
 from flask import Flask, request, jsonify, url_for, Blueprint
 from sqlalchemy.exc import IntegrityError
-from api.models import db, User
 from api.utils import generate_sitemap, APIException, validate_email, send_email
+from api.models import db, User, Categoria, Complejo, Cancha
 from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
 from base64 import b64encode
@@ -13,8 +13,6 @@ from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identi
 from datetime import timedelta
 
 api = Blueprint('api', __name__)
-
-# Allow CORS requests to this API
 CORS(api)
 
 
@@ -231,3 +229,41 @@ def activate_account():
     except Exception as error:
         db.session.rollback()
         return jsonify({"error": f"Error activating user: {error.args}"}), 500
+
+
+@api.route('/hello', methods=['GET'])
+def handle_hello():
+    return jsonify({"message": "Hello!"}), 200
+
+
+@api.route('/categorias', methods=['GET'])
+def get_categorias():
+    categorias = Categoria.query.all()
+    return jsonify([c.serialize() for c in categorias]), 200
+
+
+@api.route('/complejos', methods=['GET'])
+def get_complejos():
+    categoria = request.args.get('categoria')
+    if categoria:
+        complejos = Complejo.query.join(Categoria).\
+            filter(Categoria.nombre == categoria).all()
+    else:
+        complejos = Complejo.query.all()
+    return jsonify([c.serialize() for c in complejos]), 200
+
+
+@api.route('/complejos/<int:id>', methods=['GET'])
+def get_complejo(id):
+    complejo = Complejo.query.get(id)
+    if not complejo:
+        return jsonify({"error": "Complejo no encontrado"}), 404
+    return jsonify(complejo.serialize()), 200
+
+
+@api.route('/canchas', methods=['GET'])
+def get_canchas():
+    complejo_id = request.args.get('complejo_id')
+    categoria = request.args.get('categoria')
+    canchas = Cancha.query.filter_by(complejo_id=complejo_id).all()
+    return jsonify([c.serialize() for c in canchas]), 200
