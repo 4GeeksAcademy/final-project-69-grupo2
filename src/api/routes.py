@@ -4,7 +4,7 @@ This module takes care of starting the API Server, Loading the DB and Adding the
 from flask import Flask, request, jsonify, url_for, Blueprint
 from sqlalchemy.exc import IntegrityError
 from api.utils import generate_sitemap, APIException, validate_email, send_email
-from api.models import db, User, Categoria, Complejo, Cancha
+from api.models import db, User, Categoria, Complejo, Cancha, Reserva
 from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
 from base64 import b64encode
@@ -304,3 +304,52 @@ def get_canchas():
     complejo_id = request.args.get('complejo_id')
     canchas = Cancha.query.filter_by(complejo_id=complejo_id).all()
     return jsonify([c.serialize() for c in canchas]), 200
+
+@api.route('/reservas/horarios', methods=['GET'])
+def get_horarios():
+    cancha_id = request.args.get('cancha_id')
+    fecha = request.args.get('fecha')
+    if not cancha_id or not fecha:
+        return jsonify({"error": "Faltan parámetros"}), 400
+    reservas = Reserva.query.filter_by(cancha_id=cancha_id, fecha=fecha).all()
+    ocupados = [r.hora for r in reservas]
+    return jsonify({"ocupados": ocupados}), 200
+
+
+@api.route('/reservas', methods=['POST'])
+@jwt_required()
+def crear_reserva():
+    current_user_id = get_jwt_identity()
+    body = request.get_json()
+    cancha_id = body.get('cancha_id')
+    fecha = body.get('fecha')
+    hora = body.get('hora')
+    if not cancha_id or not fecha or not hora:
+        return jsonify({"error": "Faltan campos requeridos"}), 400
+    reserva_existente = Reserva.query.filter_by(
+        cancha_id=cancha_id, fecha=fecha, hora=hora
+    ).first()
+    if reserva_existente:
+        return jsonify({"error": "Ese horario ya está ocupado"}), 409
+    nueva_reserva = Reserva(
+        cancha_id=cancha_id,
+        fecha=fecha,
+        hora=hora,
+        user_id=int(current_user_id),
+        estado="pendiente"
+    )
+    db.session.add(nueva_reserva)
+    db.session.commit()
+    return jsonify(nueva_reserva.serialize()), 201
+
+
+@api.route('/reservas/<int:id>', methods=['PUT'])
+@jwt_required()
+def actualizar_reserva(id):
+    reserva = Reserva.query.get(id)
+    if not reserva:
+        return jsonify({"error": "Reserva no encontrada"}), 404
+    body = request.get_json()
+    reserva.estado = body.get('estado', reserva.estado)
+    db.session.commit()
+    return jsonify(reserva.serialize()), 200

@@ -42,22 +42,21 @@ class Categoria(db.Model):
         return {"id": self.id, "nombre": self.nombre}
 
 
-
 class Complejo(db.Model):
     id: Mapped[int] = mapped_column(primary_key=True)
     nombre: Mapped[str] = mapped_column(String(120), nullable=False)
-    email: Mapped[str] = mapped_column(String(120), nullable=True) 
-    phone: Mapped[str] = mapped_column(String(20), nullable=True)  
-    address: Mapped[str] = mapped_column(String(200), nullable=True) 
-    country: Mapped[str] = mapped_column(String(80), nullable=True)  
-    city: Mapped[str] = mapped_column(String(80), nullable=True)     
-    google_map: Mapped[str] = mapped_column(String(500), nullable=True) 
+    email: Mapped[str] = mapped_column(String(120), nullable=True)
+    phone: Mapped[str] = mapped_column(String(20), nullable=True)
+    address: Mapped[str] = mapped_column(String(200), nullable=True)
+    country: Mapped[str] = mapped_column(String(80), nullable=True)
+    city: Mapped[str] = mapped_column(String(80), nullable=True)
+    google_map: Mapped[str] = mapped_column(String(500), nullable=True)
     imagen_url: Mapped[str] = mapped_column(String(300), nullable=True)
-    
-    categoria_id: Mapped[int] = mapped_column(db.ForeignKey("categoria.id"), nullable=True)
+
+    categoria_id: Mapped[int] = mapped_column(
+        db.ForeignKey("categoria.id"), nullable=True)
     categoria: Mapped["Categoria"] = relationship(back_populates="complejos")
     canchas: Mapped[list["Cancha"]] = relationship(back_populates="complejo")
-
 
     def serialize(self):
         return {
@@ -73,16 +72,41 @@ class Complejo(db.Model):
             "categoria": self.categoria.nombre if self.categoria else "Sin categoría"
         }
 
+
 class Cancha(db.Model):
     id: Mapped[int] = mapped_column(primary_key=True)
     nombre: Mapped[str] = mapped_column(String(120), nullable=False)
     complejo_id: Mapped[int] = mapped_column(
         db.ForeignKey("complejo.id"), nullable=False)
     complejo: Mapped["Complejo"] = relationship(back_populates="canchas")
+    reservas: Mapped[list["Reserva"]] = relationship(back_populates="cancha")
 
     def serialize(self):
         return {
             "id": self.id,
             "nombre": self.nombre,
             "complejo_id": self.complejo_id
+        }
+
+
+class Reserva(db.Model):
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        db.ForeignKey("users.id"), nullable=False)
+    cancha_id: Mapped[int] = mapped_column(
+        db.ForeignKey("cancha.id"), nullable=False)
+    fecha: Mapped[str] = mapped_column(String(20), nullable=False)
+    hora: Mapped[str] = mapped_column(String(10), nullable=False)
+    estado: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="pendiente")
+    cancha: Mapped["Cancha"] = relationship(back_populates="reservas")
+
+    def serialize(self):
+        return {
+            "id": self.id,
+            "user_id": self.user_id,
+            "cancha_id": self.cancha_id,
+            "fecha": self.fecha,
+            "hora": self.hora,
+            "estado": self.estado
         }
