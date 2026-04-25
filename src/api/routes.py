@@ -11,9 +11,32 @@ from base64 import b64encode
 import os
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity, JWTManager, get_jwt, decode_token
 from datetime import timedelta
+import cloudinary.uploader as cloudinary_upload
 
 api = Blueprint('api', __name__)
 CORS(api)
+
+ALLOWED_IMG_EXTENSIONS = {'image/png', 'image/jpg',
+                          'image/jpeg', 'image/gif', 'image/webp'}
+MAX_IMG_SIZE = 2 * 1024 * 1024  # 2MB
+
+
+def _resolve_avatar_url(avatar_file):
+    if avatar_file.mimetype not in ALLOWED_IMG_EXTENSIONS:
+        raise ValueError(
+            "Invalid image format. Allowed formats: PNG, JPG, JPEG, GIF, WEBP")
+
+    if len(avatar_file.read()) > MAX_IMG_SIZE:
+        raise ValueError("Image size exceeds the maximum limit of 2MB")
+
+    if not avatar_file:
+        return "https://i.pravatar.cc/300"
+
+    avatar_file.stream.seek(0, 2)
+    file_size = avatar_file.stream.tell()
+    avatar_file.stream.seek(0)
+
+    return "https://i.pravatar.cc/300"
 
 
 @api.route('/health-check', methods=["GET"])
@@ -36,6 +59,15 @@ def create_user():
     username = data["username"].strip()
     password = data["password"].strip()
     avatar_file = data.get("avatar_url")
+    avatar_url = _resolve_avatar_url(avatar_file)
+
+    if avatar_file:
+        try:
+            uploaded_result = cloudinary_upload.upload(
+                avatar_file, folder="avatars")
+            avatar = uploaded_result.get("secure_url", avatar_url)
+        except ValueError as e:
+            return jsonify({"error": str(e)}), 500
 
     valid_email = validate_email(email)
     if not valid_email:
@@ -43,8 +75,6 @@ def create_user():
 
     if User.query.filter_by(email=email).first():
         return jsonify({"error": "Email already exists"}), 400
-
-    avatar = "https://i.pravatar.cc/300"
 
     salt = b64encode(os.urandom(32)).decode('utf-8')
     password = generate_password_hash(password+salt)
@@ -56,7 +86,7 @@ def create_user():
             password=password,
             salt=salt,
             is_active=True,
-            avatar_url=avatar)
+            avatar_url=avatar_url)
 
         db.session.add(new_user)
         db.session.commit()
