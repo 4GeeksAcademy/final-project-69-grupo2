@@ -66,10 +66,10 @@ export const Register = () => {
 
     return (
         <>
-            <div className="container">
+            <div className="container py-5">
                 <div className="row justify-content-center">
                     <div className="col-12 col-md-8 col-lg-6">
-                        <h1>Register</h1>
+
                         <form
                             className="border p-4 rounded"
                             onSubmit={handleSubmit}
@@ -128,7 +128,7 @@ export const Register = () => {
                                 <button
                                     type="submit"
                                     disabled={loading}
-                                    className="btn btn-primary"
+                                    className="btn btn-auth-shared"
                                 >
                                     {loading ? "Registering..." : "Register"}
                                 </button>
