@@ -1,9 +1,18 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import useGlobalReducer from "../hooks/useGlobalReducer";
 
 export const Navbar = () => {
 	const [categorias, setCategorias] = useState([]);
 	const navigate = useNavigate();
+	const { store, dispatch } = useGlobalReducer();
+	const isAuthenticated = Boolean(store?.auth?.isAuthenticated);
+
+	const handleLogout = () => {
+		localStorage.clear();
+		dispatch({ type: "clear_auth" });
+		navigate("/");
+	};
 
 	useEffect(() => {
 		fetch(import.meta.env.VITE_BACKEND_URL + "/api/categorias")
@@ -31,7 +40,7 @@ export const Navbar = () => {
 					<Link className="nav-link text-white" to="/">Actividades</Link>
 					<Link className="nav-link text-white" to="/reservas">Reservas</Link>
 					<Link className="nav-link text-white" to="/">Eventos</Link>
-					<Link className="nav-link text-white" to="/registro">Registro</Link>
+					{!isAuthenticated && <Link className="nav-link text-white" to="/register">Registro</Link>}
 
 					<div className="dropdown">
 						<button
@@ -65,6 +74,16 @@ export const Navbar = () => {
 					>
 						RESERVAR CANCHA
 					</button>
+
+					{isAuthenticated && (
+						<button
+							className="btn btn-outline-light"
+							style={{ fontWeight: 600, padding: "8px 20px", borderRadius: "8px" }}
+							onClick={handleLogout}
+						>
+							LOG OUT
+						</button>
+					)}
 				</div>
 			</div>
 		</nav>

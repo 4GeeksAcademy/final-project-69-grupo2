@@ -85,10 +85,43 @@ def create_user():
             username=username,
             password=password,
             salt=salt,
-            is_active=True,
-            avatar_url=avatar_url)
+            is_active=False,
+            avatar_url=avatar)
 
         db.session.add(new_user)
+        db.session.flush()
+
+        frontend_url = (os.getenv("URL_FRONTEND") or "").strip()
+        if not frontend_url:
+            db.session.rollback()
+            return jsonify({"error": "El URL_FRONTEND is required"}), 500
+
+        activaton_token = create_access_token(
+            identity=str(new_user.id),
+            additional_claims={"purpose": "account_activation"},
+            expires_delta=timedelta(hours=1)
+        )
+
+        activation_link = f"{frontend_url}api/activate-account?token={activaton_token}"
+        email_body = f"""
+        <div>
+            <p>Hola {new_user.username},</p>
+            <p>Bienvenido! Por favor activa tu cuenta ingresando al siguiente enlace:</p>
+            <a href=\"{activation_link}\">Activar cuenta</a>
+            <p>If you did not create this account, you can ignore this email.</p>
+        </div>
+        """
+
+        success = send_email(
+            subject="Activación de usuario",
+            to=new_user.email,
+            body=email_body
+        )
+
+        if not success:
+            db.session.rollback()
+            return jsonify({"error": "Failed to send activation email"}), 500
+
         db.session.commit()
 
         return jsonify({"message": "User created successfully"}), 201
