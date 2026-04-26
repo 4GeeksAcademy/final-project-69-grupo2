@@ -18,6 +18,7 @@ export const initialStore = () => {
 
   return {
     message: null,
+    complejos: [],
     auth: {
       token: token && token !== "undefined" && token !== "null" ? token : null,
       user,
@@ -35,6 +36,23 @@ export default function storeReducer(store, action = {}) {
         ...store,
         message: action.payload,
       };
+    case "set_complejos":
+      return {
+        ...store,
+        complejos: action.payload,
+      };
+    case "add_complejo":
+      return {
+        ...store,
+        complejos: [...store.complejos, action.payload],
+      };
+    case "delete_complejo":
+      return {
+        ...store,
+        complejos: store.complejos.filter((c) => c.id !== action.payload),
+      };
+
+    case "add_task":
 
     case "set_auth": {
       const { token, user } = action.payload || {};
