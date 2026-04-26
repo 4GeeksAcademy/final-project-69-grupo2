@@ -59,7 +59,7 @@ export const Login = () => {
         <div className="container py-5">
             <div className="row justify-content-center">
                 <div className="col-12 col-md-8 col-lg-6">
-                    <h1 className="text-center mb-4">Login</h1>
+
                     <form className="border p-4 rounded" onSubmit={handleSubmit}>
                         {error && <div className="alert alert-danger" role="alert">{error}</div>}
                         {success && <div className="alert alert-success" role="alert">{success}</div>}
@@ -93,7 +93,7 @@ export const Login = () => {
                         </div>
 
                         <div className="d-grid">
-                            <button type="submit" className="btn btn-primary" disabled={loading}>
+                            <button type="submit" className="btn btn-auth-shared" disabled={loading}>
                                 {loading ? "Signing in..." : "Login"}
                             </button>
                         </div>
