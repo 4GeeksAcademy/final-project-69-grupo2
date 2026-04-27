@@ -30,7 +30,6 @@ const ContactComplejoDeportivo = ({ complejo, onDelete }) => {
                         <small><i className="fa fa-globe me-2"></i>{complejo.city}, {complejo.country}</small>
                     </p>
                     
-                  
                     {complejo.google_map && (
                         <a 
                             href={complejo.google_map.startsWith('http') ? complejo.google_map : `https://${complejo.google_map}`} 
@@ -42,9 +41,12 @@ const ContactComplejoDeportivo = ({ complejo, onDelete }) => {
                         </a>
                     )}
                 </div>
+                 <Link to={`/complejo/${complejo.id}/add-cancha`} className="btn btn-outline-success btn-sm">
+                    <i className="fa fa-futbol me-1"></i> Canchas
+                </Link>
 
                 <div className="col-md-3 d-flex justify-content-end align-items-start">
-                    <Link to={`/edit-complejo/${complejo.id}`} className="btn btn-link p-0 me-3 text-dark">
+                    <Link to={`/add-complejo/${complejo.id}`} className="btn btn-link p-0 me-3 text-dark">
                         <i className="fa fa-pencil fa-lg"></i>
                     </Link>
                     <button 
@@ -66,7 +68,7 @@ const ContactComplejoDeportivo = ({ complejo, onDelete }) => {
                             <h5 className="modal-title">¿Eliminar {complejo.name}?</h5>
                         </div>
                         <div className="modal-body">
-                            Esta acción no se puede deshacer.
+                            Esta acción no se puede deshacer y borrará toda la información asociada.
                         </div>
                         <div className="modal-footer">
                             <button className="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>

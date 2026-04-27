@@ -77,13 +77,17 @@ class Complejo(db.Model):
 class Cancha(db.Model):
     id: Mapped[int] = mapped_column(primary_key=True)
     nombre: Mapped[str] = mapped_column(String(120), nullable=False)
-    complejo_id: Mapped[int] = mapped_column(
-        db.ForeignKey("complejo.id"), nullable=False)
+    
+    complejo_id: Mapped[int] = mapped_column(db.ForeignKey("complejo.id"), nullable=False)
+    categoria_id: Mapped[int] = mapped_column(db.ForeignKey("categoria.id"), nullable=True)
+    
     complejo: Mapped["Complejo"] = relationship(back_populates="canchas")
+    categoria: Mapped["Categoria"] = relationship()
 
     def serialize(self):
         return {
             "id": self.id,
             "nombre": self.nombre,
-            "complejo_id": self.complejo_id
+            "complejo_id": self.complejo_id,
+            "categoria_nombre": self.categoria.nombre if self.categoria else "Sin categoría"
         }
