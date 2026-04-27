@@ -1,9 +1,21 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import useGlobalReducer from "../hooks/useGlobalReducer";
 
 export const Navbar = () => {
 	const [categorias, setCategorias] = useState([]);
 	const navigate = useNavigate();
+	const { store, dispatch } = useGlobalReducer();
+	const isAuthenticated = Boolean(store?.auth?.isAuthenticated);
+	const user = store?.auth?.user;
+	const avatarUrl = user?.avatar_url;
+	const avatarFallback = (user?.username?.[0] || user?.email?.[0] || "U").toUpperCase();
+
+	const handleLogout = () => {
+		localStorage.clear();
+		dispatch({ type: "clear_auth" });
+		navigate("/");
+	};
 
 	useEffect(() => {
 		fetch(import.meta.env.VITE_BACKEND_URL + "/api/categorias")
@@ -33,7 +45,7 @@ export const Navbar = () => {
 					<Link className="nav-link text-white" to="/">Actividades</Link>
 					<Link className="nav-link text-white" to="/reservas">Reservas</Link>
 					<Link className="nav-link text-white" to="/">Eventos</Link>
-					<Link className="nav-link text-white" to="/registro">Registro</Link>
+					{!isAuthenticated && <Link className="nav-link text-white" to="/register">Registro</Link>}
 					<Link className="nav-link text-white" to="/add-complejo">
 
 						<i className="fa fa-plus me-1"></i> Añadir Complejo
@@ -70,6 +82,52 @@ export const Navbar = () => {
 					>
 						RESERVAR CANCHA
 					</button>
+
+					{!isAuthenticated && (
+						<button
+							className="btn btn-outline-light"
+							style={{ fontWeight: 600, padding: "8px 20px", borderRadius: "8px" }}
+							onClick={() => navigate("/login")}
+						>
+							LOGIN
+						</button>
+					)}
+
+					{isAuthenticated && (
+						<div className="d-flex align-items-center gap-2">
+							<div
+								className="d-flex align-items-center justify-content-center text-uppercase"
+								style={{
+									width: "34px",
+									height: "34px",
+									borderRadius: "50%",
+									overflow: "hidden",
+									border: "2px solid #C8F135",
+									background: "#14263b",
+									color: "#fff",
+									fontWeight: 700,
+									fontSize: "12px"
+								}}
+								title={user?.username || user?.email || "Usuario"}
+							>
+								{avatarUrl ? (
+									<img
+										src={avatarUrl}
+										alt="Avatar"
+										style={{ width: "100%", height: "100%", objectFit: "cover" }}
+									/>
+								) : (
+									<span>{avatarFallback}</span>
+								)}
+							</div>
+							<button
+								className="btn btn-auth-shared"
+								onClick={handleLogout}
+							>
+								Log Out
+							</button>
+						</div>
+					)}
 				</div>
 			</div>
 		</nav>
