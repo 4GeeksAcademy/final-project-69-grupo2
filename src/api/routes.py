@@ -11,9 +11,32 @@ from base64 import b64encode
 import os
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity, JWTManager, get_jwt, decode_token
 from datetime import timedelta
+import cloudinary.uploader as cloudinary_upload
 
 api = Blueprint('api', __name__)
 CORS(api)
+
+ALLOWED_IMG_EXTENSIONS = {'image/png', 'image/jpg',
+                          'image/jpeg', 'image/gif', 'image/webp'}
+MAX_IMG_SIZE = 2 * 1024 * 1024  # 2MB
+
+
+def _resolve_avatar_url(avatar_file):
+    if avatar_file.mimetype not in ALLOWED_IMG_EXTENSIONS:
+        raise ValueError(
+            "Invalid image format. Allowed formats: PNG, JPG, JPEG, GIF, WEBP")
+
+    if len(avatar_file.read()) > MAX_IMG_SIZE:
+        raise ValueError("Image size exceeds the maximum limit of 2MB")
+
+    if not avatar_file:
+        return "https://i.pravatar.cc/300"
+
+    avatar_file.stream.seek(0, 2)
+    file_size = avatar_file.stream.tell()
+    avatar_file.stream.seek(0)
+
+    return "https://i.pravatar.cc/300"
 
 
 @api.route('/health-check', methods=["GET"])
@@ -36,6 +59,15 @@ def create_user():
     username = data["username"].strip()
     password = data["password"].strip()
     avatar_file = data.get("avatar_url")
+    avatar_url = _resolve_avatar_url(avatar_file)
+
+    if avatar_file:
+        try:
+            uploaded_result = cloudinary_upload.upload(
+                avatar_file, folder="avatars")
+            avatar = uploaded_result.get("secure_url", avatar_url)
+        except ValueError as e:
+            return jsonify({"error": str(e)}), 500
 
     valid_email = validate_email(email)
     if not valid_email:
@@ -43,8 +75,6 @@ def create_user():
 
     if User.query.filter_by(email=email).first():
         return jsonify({"error": "Email already exists"}), 400
-
-    avatar = "https://i.pravatar.cc/300"
 
     salt = b64encode(os.urandom(32)).decode('utf-8')
     password = generate_password_hash(password+salt)
@@ -55,10 +85,43 @@ def create_user():
             username=username,
             password=password,
             salt=salt,
-            is_active=True,
+            is_active=False,
             avatar_url=avatar)
 
         db.session.add(new_user)
+        db.session.flush()
+
+        frontend_url = (os.getenv("URL_FRONTEND") or "").strip()
+        if not frontend_url:
+            db.session.rollback()
+            return jsonify({"error": "El URL_FRONTEND is required"}), 500
+
+        activaton_token = create_access_token(
+            identity=str(new_user.id),
+            additional_claims={"purpose": "account_activation"},
+            expires_delta=timedelta(hours=1)
+        )
+
+        activation_link = f"{frontend_url}api/activate-account?token={activaton_token}"
+        email_body = f"""
+        <div>
+            <p>Hola {new_user.username},</p>
+            <p>Bienvenido! Por favor activa tu cuenta ingresando al siguiente enlace:</p>
+            <a href=\"{activation_link}\">Activar cuenta</a>
+            <p>If you did not create this account, you can ignore this email.</p>
+        </div>
+        """
+
+        success = send_email(
+            subject="Activación de usuario",
+            to=new_user.email,
+            body=email_body
+        )
+
+        if not success:
+            db.session.rollback()
+            return jsonify({"error": "Failed to send activation email"}), 500
+
         db.session.commit()
 
         return jsonify({"message": "User created successfully"}), 201
@@ -298,11 +361,16 @@ def delete_complejo(id):
     return jsonify({"msg": "Eliminado"}), 200
 
 
-
 @api.route('/canchas', methods=['GET'])
 def get_canchas():
     complejo_id = request.args.get('complejo_id')
-    canchas = Cancha.query.filter_by(complejo_id=complejo_id).all()
+    
+    # Si hay ID, filtramos. Si no hay, traemos todas (o una lista vacía)
+    if complejo_id:
+        canchas = Cancha.query.filter_by(complejo_id=complejo_id).all()
+    else:
+        canchas = Cancha.query.all() # O [] si prefieres
+        
     return jsonify([c.serialize() for c in canchas]), 200
 
 @api.route('/reservas/horarios', methods=['GET'])
@@ -353,3 +421,45 @@ def actualizar_reserva(id):
     reserva.estado = body.get('estado', reserva.estado)
     db.session.commit()
     return jsonify(reserva.serialize()), 200
+@api.route('/cancha', methods=['POST'])
+def add_cancha():
+    body = request.get_json()
+    
+    # Validación básica de campos obligatorios
+    nombre = body.get('nombre')
+    complejo_id = body.get('complejo_id')
+    categoria_id = body.get('categoria_id')
+
+    if not nombre or not complejo_id:
+        return jsonify({"msg": "Faltan datos obligatorios: nombre o complejo_id"}), 400
+
+    try:
+        nueva_cancha = Cancha(
+            nombre=nombre,
+            complejo_id=complejo_id,
+            categoria_id=categoria_id # Puede ser None si no se selecciona
+        )
+        db.session.add(nueva_cancha)
+        db.session.commit()
+        
+        return jsonify(nueva_cancha.serialize()), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"msg": "Error al crear la cancha", "error": str(e)}), 500
+
+
+@api.route('/cancha/<int:id>', methods=['DELETE'])
+def delete_cancha(id):
+    cancha = Cancha.query.get(id)
+    
+    if not cancha:
+        return jsonify({"msg": "La cancha no existe"}), 404
+
+    try:
+        db.session.delete(cancha)
+        db.session.commit()
+        return jsonify({"msg": f"Cancha {id} eliminada correctamente"}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"msg": "Error al eliminar la cancha", "error": str(e)}), 500
+    
