@@ -369,5 +369,54 @@ def delete_complejo(id):
 @api.route('/canchas', methods=['GET'])
 def get_canchas():
     complejo_id = request.args.get('complejo_id')
-    canchas = Cancha.query.filter_by(complejo_id=complejo_id).all()
+    
+    # Si hay ID, filtramos. Si no hay, traemos todas (o una lista vacía)
+    if complejo_id:
+        canchas = Cancha.query.filter_by(complejo_id=complejo_id).all()
+    else:
+        canchas = Cancha.query.all() # O [] si prefieres
+        
     return jsonify([c.serialize() for c in canchas]), 200
+
+@api.route('/cancha', methods=['POST'])
+def add_cancha():
+    body = request.get_json()
+    
+    # Validación básica de campos obligatorios
+    nombre = body.get('nombre')
+    complejo_id = body.get('complejo_id')
+    categoria_id = body.get('categoria_id')
+
+    if not nombre or not complejo_id:
+        return jsonify({"msg": "Faltan datos obligatorios: nombre o complejo_id"}), 400
+
+    try:
+        nueva_cancha = Cancha(
+            nombre=nombre,
+            complejo_id=complejo_id,
+            categoria_id=categoria_id # Puede ser None si no se selecciona
+        )
+        db.session.add(nueva_cancha)
+        db.session.commit()
+        
+        return jsonify(nueva_cancha.serialize()), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"msg": "Error al crear la cancha", "error": str(e)}), 500
+
+
+@api.route('/cancha/<int:id>', methods=['DELETE'])
+def delete_cancha(id):
+    cancha = Cancha.query.get(id)
+    
+    if not cancha:
+        return jsonify({"msg": "La cancha no existe"}), 404
+
+    try:
+        db.session.delete(cancha)
+        db.session.commit()
+        return jsonify({"msg": f"Cancha {id} eliminada correctamente"}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"msg": "Error al eliminar la cancha", "error": str(e)}), 500
+    
