@@ -96,13 +96,13 @@ def create_user():
             db.session.rollback()
             return jsonify({"error": "El URL_FRONTEND is required"}), 500
 
-        activaton_token = create_access_token(
+        activation_token = create_access_token(
             identity=str(new_user.id),
             additional_claims={"purpose": "account_activation"},
             expires_delta=timedelta(hours=1)
         )
 
-        activation_link = f"{frontend_url}api/activate-account?token={activaton_token}"
+        activation_link = f"{frontend_url}activate-account?token={activation_token}"
         email_body = f"""
         <div>
             <p>Hola {new_user.username},</p>
@@ -298,11 +298,11 @@ def activate_account():
 def handle_hello():
     return jsonify({"message": "Hello!"}), 200
 
+
 @api.route('/categorias', methods=['GET'])
 def get_categorias():
     categorias = Categoria.query.all()
     return jsonify([c.serialize() for c in categorias]), 200
-
 
 
 @api.route('/complejos', methods=['GET'])
@@ -310,12 +310,14 @@ def get_complejos():
     complejos = Complejo.query.all()
     return jsonify([c.serialize() for c in complejos]), 200
 
+
 @api.route('/complejo/<int:id>', methods=['GET'])
 def get_complejo(id):
     complejo = Complejo.query.get(id)
     if not complejo:
         return jsonify({"error": "Complejo no encontrado"}), 404
     return jsonify(complejo.serialize()), 200
+
 
 @api.route('/complejo', methods=['POST'])
 def add_complejo():
@@ -328,34 +330,37 @@ def add_complejo():
         country=body.get('country'),
         city=body.get('city'),
         google_map=body.get('google_map'),
-        categoria_id=body.get('categoria_id') 
+        categoria_id=body.get('categoria_id')
     )
     db.session.add(nuevo_complejo)
     db.session.commit()
     return jsonify({"msg": "Complejo creado", "id": nuevo_complejo.id}), 201
 
+
 @api.route('/complejo/<int:id>', methods=['PUT'])
 def update_complejo(id):
     complejo = Complejo.query.get(id)
-    if not complejo: return jsonify({"msg": "No existe"}), 404
+    if not complejo:
+        return jsonify({"msg": "No existe"}), 404
     body = request.get_json()
-    
-   
+
     complejo.nombre = body.get('name', complejo.nombre)
     complejo.email = body.get('email', complejo.email)
     complejo.phone = body.get('phone', complejo.phone)
     complejo.address = body.get('address', complejo.address)
     complejo.country = body.get('country', complejo.country)
-    complejo.city = body.get('city', complejo.city)          
+    complejo.city = body.get('city', complejo.city)
     complejo.google_map = body.get('google_map', complejo.google_map)
-    
+
     db.session.commit()
     return jsonify(complejo.serialize()), 200
+
 
 @api.route('/complejo/<int:id>', methods=['DELETE'])
 def delete_complejo(id):
     complejo = Complejo.query.get(id)
-    if not complejo: return jsonify({"msg": "No existe"}), 404
+    if not complejo:
+        return jsonify({"msg": "No existe"}), 404
     db.session.delete(complejo)
     db.session.commit()
     return jsonify({"msg": "Eliminado"}), 200
