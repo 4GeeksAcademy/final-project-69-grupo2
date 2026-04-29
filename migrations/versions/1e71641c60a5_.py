@@ -1,8 +1,8 @@
 """empty message
 
-Revision ID: 67ba5bc93975
+Revision ID: 1e71641c60a5
 Revises: 
-Create Date: 2026-04-25 23:41:05.681539
+Create Date: 2026-04-28 01:34:05.420185
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '67ba5bc93975'
+revision = '1e71641c60a5'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -40,8 +40,14 @@ def upgrade():
     op.create_table('complejo',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('nombre', sa.String(length=120), nullable=False),
+    sa.Column('email', sa.String(length=120), nullable=True),
+    sa.Column('phone', sa.String(length=20), nullable=True),
+    sa.Column('address', sa.String(length=200), nullable=True),
+    sa.Column('country', sa.String(length=80), nullable=True),
+    sa.Column('city', sa.String(length=80), nullable=True),
+    sa.Column('google_map', sa.String(length=500), nullable=True),
     sa.Column('imagen_url', sa.String(length=300), nullable=True),
-    sa.Column('categoria_id', sa.Integer(), nullable=False),
+    sa.Column('categoria_id', sa.Integer(), nullable=True),
     sa.ForeignKeyConstraint(['categoria_id'], ['categoria.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
@@ -49,6 +55,8 @@ def upgrade():
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('nombre', sa.String(length=120), nullable=False),
     sa.Column('complejo_id', sa.Integer(), nullable=False),
+    sa.Column('categoria_id', sa.Integer(), nullable=True),
+    sa.ForeignKeyConstraint(['categoria_id'], ['categoria.id'], ),
     sa.ForeignKeyConstraint(['complejo_id'], ['complejo.id'], ),
     sa.PrimaryKeyConstraint('id')
     )

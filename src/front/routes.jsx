@@ -17,7 +17,8 @@ import { Login } from "./pages/Login";
 import { ForgotPassword } from "./pages/ForgotPassword";
 import { RecoveryPassword } from "./pages/RecoveryPassword";
 import { ActivateAccount } from "./pages/ActivationAccount";
-
+import { GestionHorarios } from "./pages/GestionHorarios.jsx";
+import { UserReservas } from "./pages/UserReservas.jsx";
 export const router = createBrowserRouter(
   createRoutesFromElements(
     <Route path="/" element={<Layout />}>
@@ -26,6 +27,8 @@ export const router = createBrowserRouter(
       <Route path="/add-complejo" element={<AddComplejoDeportivo />} />
       <Route path="/add-complejo/:id" element={<AddComplejoDeportivo />} />
       <Route path="/complejo/:complejoId/add-cancha" element={<AddCancha />} />
+      <Route element={<GestionHorarios />} path="/gestion-horarios/:canchaId" />
+      <Route element={<UserReservas />} path="/reservar/:canchaId" />
       <Route path="/single/:theId" element={<Single />} />
       <Route path="/demo" element={<Demo />} />
       <Route path="/reservas" element={<Reservas />} />

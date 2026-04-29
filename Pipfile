@@ -19,11 +19,8 @@ flask-jwt-extended = "==4.6.0"
 wtforms = "==3.1.2"
 sqlalchemy = "*"
 sendgrid = "*"
-<<<<<<< HEAD
 flask-cors = "*"
-=======
 cloudinary = "*"
->>>>>>> origin
 
 [requires]
 python_version = "3.13"

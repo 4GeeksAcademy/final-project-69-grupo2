@@ -4,7 +4,7 @@ This module takes care of starting the API Server, Loading the DB and Adding the
 from flask import Flask, request, jsonify, url_for, Blueprint
 from sqlalchemy.exc import IntegrityError
 from api.utils import generate_sitemap, APIException, validate_email, send_email
-from api.models import db, User, Categoria, Complejo, Cancha
+from api.models import db, User, Categoria, Complejo, Cancha, Reserva
 from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
 from base64 import b64encode
@@ -321,39 +321,76 @@ def get_complejo(id):
 
 @api.route('/complejo', methods=['POST'])
 def add_complejo():
-    body = request.get_json()
-    nuevo_complejo = Complejo(
-        nombre=body.get('name'),
-        email=body.get('email'),
-        phone=body.get('phone'),
-        address=body.get('address'),
-        country=body.get('country'),
-        city=body.get('city'),
-        google_map=body.get('google_map'),
-        categoria_id=body.get('categoria_id')
-    )
-    db.session.add(nuevo_complejo)
-    db.session.commit()
-    return jsonify({"msg": "Complejo creado", "id": nuevo_complejo.id}), 201
+    # Recibimos del FormData (Frontend usa 'name')
+    nombre = request.form.get("name")
+    email = request.form.get("email")
+    phone = request.form.get("phone")
+    address = request.form.get("address")
+    country = request.form.get("country")
+    city = request.form.get("city")
+    google_map = request.form.get("google_map")
+
+    image_file = request.files.get("image")
+    url_cloudinary = None
+
+    if image_file:
+        try:
+            upload_result = cloudinary_upload.upload(
+                image_file, folder="complejos")
+            url_cloudinary = upload_result.get("secure_url")
+        except Exception as e:
+            return jsonify({"error": f"Error Cloudinary: {str(e)}"}), 500
+
+    try:
+        nuevo_complejo = Complejo(
+            nombre=nombre,  # Usamos 'nombre' como dice tu clase
+            email=email,
+            phone=phone,
+            address=address,
+            country=country,
+            city=city,
+            google_map=google_map,
+            imagen_url=url_cloudinary  # Usamos 'imagen_url' como dice tu clase
+        )
+        db.session.add(nuevo_complejo)
+        db.session.commit()
+        return jsonify(nuevo_complejo.serialize()), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
 
 
 @api.route('/complejo/<int:id>', methods=['PUT'])
 def update_complejo(id):
     complejo = Complejo.query.get(id)
     if not complejo:
-        return jsonify({"msg": "No existe"}), 404
-    body = request.get_json()
+        return jsonify({"error": "Complejo no encontrado"}), 404
 
-    complejo.nombre = body.get('name', complejo.nombre)
-    complejo.email = body.get('email', complejo.email)
-    complejo.phone = body.get('phone', complejo.phone)
-    complejo.address = body.get('address', complejo.address)
-    complejo.country = body.get('country', complejo.country)
-    complejo.city = body.get('city', complejo.city)
-    complejo.google_map = body.get('google_map', complejo.google_map)
+    # IMPORTANTE: Usar los nombres exactos de tu modelo (nombre, country, city, etc.)
+    complejo.nombre = request.form.get("name", complejo.nombre)
+    complejo.email = request.form.get("email", complejo.email)
+    complejo.phone = request.form.get("phone", complejo.phone)
+    complejo.address = request.form.get("address", complejo.address)
+    complejo.country = request.form.get("country", complejo.country)
+    complejo.city = request.form.get("city", complejo.city)
+    complejo.google_map = request.form.get("google_map", complejo.google_map)
 
-    db.session.commit()
-    return jsonify(complejo.serialize()), 200
+    image_file = request.files.get("image")
+    if image_file:
+        try:
+            upload_result = cloudinary_upload.upload(
+                image_file, folder="complejos")
+            complejo.imagen_url = upload_result.get(
+                "secure_url")  # Nombre correcto
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    try:
+        db.session.commit()
+        return jsonify(complejo.serialize()), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
 
 
 @api.route('/complejo/<int:id>', methods=['DELETE'])
@@ -369,46 +406,58 @@ def delete_complejo(id):
 @api.route('/canchas', methods=['GET'])
 def get_canchas():
     complejo_id = request.args.get('complejo_id')
-    
+
     # Si hay ID, filtramos. Si no hay, traemos todas (o una lista vacía)
     if complejo_id:
         canchas = Cancha.query.filter_by(complejo_id=complejo_id).all()
     else:
-        canchas = Cancha.query.all() # O [] si prefieres
-        
+        canchas = Cancha.query.all()  # O [] si prefieres
+
     return jsonify([c.serialize() for c in canchas]), 200
+
+
+@api.route('/cancha/<int:id>', methods=['GET'])
+def get_cancha(id):
+    cancha = Cancha.query.get(id)
+    if not cancha:
+        return jsonify({"msg": "Cancha no encontrada"}), 404
+    return jsonify(cancha.serialize()), 200
+
 
 @api.route('/cancha', methods=['POST'])
 def add_cancha():
-    body = request.get_json()
-    
-    # Validación básica de campos obligatorios
-    nombre = body.get('nombre')
-    complejo_id = body.get('complejo_id')
-    categoria_id = body.get('categoria_id')
+    nombre = request.form.get("nombre")
+    complejo_id = request.form.get("complejo_id")
+    categoria_id = request.form.get("categoria_id")
+    precio_hora = request.form.get("precio_hora")
 
-    if not nombre or not complejo_id:
-        return jsonify({"msg": "Faltan datos obligatorios: nombre o complejo_id"}), 400
+    image_file = request.files.get("image")
+    url_cloudinary = None
+
+    if image_file:
+        upload_result = cloudinary_upload.upload(image_file, folder="canchas")
+        url_cloudinary = upload_result.get("secure_url")
 
     try:
         nueva_cancha = Cancha(
             nombre=nombre,
             complejo_id=complejo_id,
-            categoria_id=categoria_id # Puede ser None si no se selecciona
+            categoria_id=categoria_id,
+            precio_hora=float(precio_hora) if precio_hora else None,
+            foto_url=url_cloudinary
         )
         db.session.add(nueva_cancha)
         db.session.commit()
-        
         return jsonify(nueva_cancha.serialize()), 201
     except Exception as e:
         db.session.rollback()
-        return jsonify({"msg": "Error al crear la cancha", "error": str(e)}), 500
+        return jsonify({"error": str(e)}), 500
 
 
 @api.route('/cancha/<int:id>', methods=['DELETE'])
 def delete_cancha(id):
     cancha = Cancha.query.get(id)
-    
+
     if not cancha:
         return jsonify({"msg": "La cancha no existe"}), 404
 
@@ -419,4 +468,66 @@ def delete_cancha(id):
     except Exception as e:
         db.session.rollback()
         return jsonify({"msg": "Error al eliminar la cancha", "error": str(e)}), 500
-    
+
+    # Obtener todas las reservas de una cancha específica
+
+
+@api.route('/reservas/<int:cancha_id>', methods=['GET'])
+def get_reservas_cancha(cancha_id):
+    reservas = Reserva.query.filter_by(cancha_id=cancha_id).all()
+    return jsonify([res.serialize() for res in reservas]), 200
+
+# Crear una nueva reserva o un bloqueo
+
+
+@api.route('/reserva', methods=['POST'])
+def add_reserva():
+    data = request.get_json()
+
+    # Validamos datos mínimos
+    if not data.get("fecha") or not data.get("hora") or not data.get("cancha_id"):
+        return jsonify({"error": "Faltan datos obligatorios: fecha, hora, cancha_id"}), 400
+
+    es_bloqueo = data.get("es_bloqueo", False)
+    user_id = data.get("user_id")
+
+    # Si no es bloqueo, user_id es obligatorio
+    if not es_bloqueo and not user_id:
+        return jsonify({"error": "user_id es requerido para reservas de usuarios"}), 400
+
+    # Si se proporciona user_id, verificar que exista
+    if user_id:
+        user = User.query.get(user_id)
+        if not user:
+            return jsonify({"error": "Usuario no encontrado"}), 404
+
+    nueva_reserva = Reserva(
+        fecha=data.get("fecha"),
+        hora=data.get("hora"),
+        cancha_id=data.get("cancha_id"),
+        es_bloqueo=es_bloqueo,
+        user_id=user_id
+    )
+
+    try:
+        db.session.add(nueva_reserva)
+        db.session.commit()
+        return jsonify(nueva_reserva.serialize()), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+
+@api.route('/reserva/<int:id>', methods=['DELETE'])
+def delete_reserva(id):
+    reserva = Reserva.query.get(id)
+    if not reserva:
+        return jsonify({"msg": "La reserva o bloqueo no existe"}), 404
+
+    try:
+        db.session.delete(reserva)
+        db.session.commit()
+        return jsonify({"msg": "Horario liberado correctamente"}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
