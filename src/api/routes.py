@@ -4,7 +4,7 @@ This module takes care of starting the API Server, Loading the DB and Adding the
 from flask import Flask, request, jsonify, url_for, Blueprint
 from sqlalchemy.exc import IntegrityError
 from api.utils import generate_sitemap, APIException, validate_email, send_email
-from api.models import db, User, Categoria, Complejo, Cancha
+from api.models import db, User, Categoria, Complejo, Cancha, Reserva
 from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
 from base64 import b64encode
@@ -22,26 +22,26 @@ MAX_IMG_SIZE = 2 * 1024 * 1024  # 2MB
 
 
 def _resolve_avatar_url(avatar_file):
+    # Primero verificar si existe o es string vacío
+    if not avatar_file or isinstance(avatar_file, str):
+        return "https://i.pravatar.cc/300"
+
     if avatar_file.mimetype not in ALLOWED_IMG_EXTENSIONS:
         raise ValueError(
             "Invalid image format. Allowed formats: PNG, JPG, JPEG, GIF, WEBP")
-
-    if len(avatar_file.read()) > MAX_IMG_SIZE:
-        raise ValueError("Image size exceeds the maximum limit of 2MB")
-
-    if not avatar_file:
-        return "https://i.pravatar.cc/300"
 
     avatar_file.stream.seek(0, 2)
     file_size = avatar_file.stream.tell()
     avatar_file.stream.seek(0)
 
-    return "https://i.pravatar.cc/300"
+    if file_size > MAX_IMG_SIZE:
+        raise ValueError("Image size exceeds the maximum limit of 2MB")
+
+    return None  # Señal de que hay archivo válido para subir a Cloudinary
 
 
 @api.route('/health-check', methods=["GET"])
 def health_check():
-
     return jsonify({"status": "Ok"}), 200
 
 
@@ -59,15 +59,20 @@ def create_user():
     username = data["username"].strip()
     password = data["password"].strip()
     avatar_file = data.get("avatar_url")
-    avatar_url = _resolve_avatar_url(avatar_file)
 
-    if avatar_file:
+    try:
+        avatar_url = _resolve_avatar_url(avatar_file)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
+    # Si hay archivo válido (avatar_url es None), subir a Cloudinary
+    if avatar_file and avatar_url is None:
         try:
             uploaded_result = cloudinary_upload.upload(
                 avatar_file, folder="avatars")
-            avatar = uploaded_result.get("secure_url", avatar_url)
-        except ValueError as e:
-            return jsonify({"error": str(e)}), 500
+            avatar_url = uploaded_result.get("secure_url", "https://i.pravatar.cc/300")
+        except Exception as e:
+            return jsonify({"error": f"Error uploading avatar: {str(e)}"}), 500
 
     valid_email = validate_email(email)
     if not valid_email:
@@ -77,16 +82,16 @@ def create_user():
         return jsonify({"error": "Email already exists"}), 400
 
     salt = b64encode(os.urandom(32)).decode('utf-8')
-    password = generate_password_hash(password+salt)
+    hashed_password = generate_password_hash(password + salt)
 
     try:
         new_user = User(
             email=email,
             username=username,
-            password=password,
+            password=hashed_password,
             salt=salt,
             is_active=False,
-            avatar_url=avatar)
+            avatar_url=avatar_url)
 
         db.session.add(new_user)
         db.session.flush()
@@ -94,7 +99,7 @@ def create_user():
         frontend_url = (os.getenv("URL_FRONTEND") or "").strip()
         if not frontend_url:
             db.session.rollback()
-            return jsonify({"error": "El URL_FRONTEND is required"}), 500
+            return jsonify({"error": "URL_FRONTEND is required"}), 500
 
         activation_token = create_access_token(
             identity=str(new_user.id),
@@ -107,7 +112,7 @@ def create_user():
         <div>
             <p>Hola {new_user.username},</p>
             <p>Bienvenido! Por favor activa tu cuenta ingresando al siguiente enlace:</p>
-            <a href=\"{activation_link}\">Activar cuenta</a>
+            <a href="{activation_link}">Activar cuenta</a>
             <p>If you did not create this account, you can ignore this email.</p>
         </div>
         """
@@ -131,6 +136,7 @@ def create_user():
         db.session.rollback()
         return jsonify({"error": "Database integrity error: " + str(e)}), 409
     except Exception as e:
+        db.session.rollback()
         return jsonify({"error": "An error occurred while creating the user"}), 500
 
 
@@ -193,9 +199,12 @@ def reset_password():
     if not user:
         return jsonify({"error": "If email exists, a password reset email will be sent"}), 404
 
-    reset_token = create_access_token(identity=str(
-        user.id), additional_claims={"purpose": "password-reset"}, expires_delta=timedelta(minutes=10))
-    frontend_url = os.getenv("URL_FRONTEND" or "").strip()
+    reset_token = create_access_token(
+        identity=str(user.id),
+        additional_claims={"purpose": "password-reset"},
+        expires_delta=timedelta(minutes=10)
+    )
+    frontend_url = (os.getenv("URL_FRONTEND") or "").strip()
 
     if not frontend_url:
         return jsonify({"error": "Frontend URL is not configured"}), 500
@@ -222,9 +231,9 @@ def reset_password():
         if success:
             return jsonify({"message": "Email sending success"}), 200
         else:
-            return jsonify({"error": "Error sended message"})
+            return jsonify({"error": "Error sending message"}), 500
     except Exception as error:
-        return jsonify({"error": f"Error sending email: {error.args}"})
+        return jsonify({"error": f"Error sending email: {error.args}"}), 500
 
 
 @api.route("/update-pwd", methods=["POST"])
@@ -232,7 +241,7 @@ def reset_password():
 def update_password():
     claims = get_jwt()
     if claims.get("purpose") != "password-reset":
-        return jsonify({"error": "Invalid tokoken for password update"}), 403
+        return jsonify({"error": "Invalid token for password update"}), 403
 
     user_id = get_jwt_identity()
     user = User.query.get(user_id)
@@ -244,18 +253,17 @@ def update_password():
     new_password = data.get("new_password", "")
 
     if not new_password:
-        return jsonify({"error": "Misssing required field: new_password"}), 400
+        return jsonify({"error": "Missing required field: new_password"}), 400
 
     salt = b64encode(os.urandom(32)).decode("utf-8")
-    user.password = generate_password_hash(new_password+salt)
+    user.password = generate_password_hash(new_password + salt)
     user.salt = salt
 
     try:
         db.session.commit()
-        return jsonify({"message": "password updated successfully"}), 200
+        return jsonify({"message": "Password updated successfully"}), 200
     except Exception as error:
         db.session.rollback()
-        print(error.args)
         return jsonify({"error": f"Error updating password: {error.args}"}), 500
 
 
@@ -265,21 +273,20 @@ def activate_account():
     token = (data.get("token") or request.args.get("token") or "").strip()
 
     if not token:
-        return jsonify({"error": "Missing required field. token"}), 400
+        return jsonify({"error": "Missing required field: token"}), 400
 
     try:
         decoded = decode_token(token)
-
     except Exception as error:
-        return jsonify({"error": f"Invalid token or expired token: {error.args}"}), 400
+        return jsonify({"error": f"Invalid or expired token: {error.args}"}), 400
 
     if decoded.get("purpose") != "account_activation":
-        return jsonify({"error": "Ivalid token purpose"}), 403
+        return jsonify({"error": "Invalid token purpose"}), 403
 
     user_id = decoded.get("sub")
     user = User.query.get(user_id)
     if not user:
-        return jsonify({"error": "user not found"}), 404
+        return jsonify({"error": "User not found"}), 404
 
     if user.is_active:
         return jsonify({"message": "User already activated"}), 200
@@ -369,20 +376,69 @@ def delete_complejo(id):
 @api.route('/canchas', methods=['GET'])
 def get_canchas():
     complejo_id = request.args.get('complejo_id')
-    
-    # Si hay ID, filtramos. Si no hay, traemos todas (o una lista vacía)
+
     if complejo_id:
         canchas = Cancha.query.filter_by(complejo_id=complejo_id).all()
     else:
-        canchas = Cancha.query.all() # O [] si prefieres
-        
+        canchas = Cancha.query.all()
+
     return jsonify([c.serialize() for c in canchas]), 200
+
+
+@api.route('/reservas/horarios', methods=['GET'])
+def get_horarios():
+    cancha_id = request.args.get('cancha_id')
+    fecha = request.args.get('fecha')
+    if not cancha_id or not fecha:
+        return jsonify({"error": "Faltan parámetros"}), 400
+    reservas = Reserva.query.filter_by(cancha_id=cancha_id, fecha=fecha).all()
+    ocupados = [r.hora for r in reservas]
+    return jsonify({"ocupados": ocupados}), 200
+
+
+@api.route('/reservas', methods=['POST'])
+@jwt_required()
+def crear_reserva():
+    current_user_id = get_jwt_identity()
+    body = request.get_json()
+    cancha_id = body.get('cancha_id')
+    fecha = body.get('fecha')
+    hora = body.get('hora')
+    if not cancha_id or not fecha or not hora:
+        return jsonify({"error": "Faltan campos requeridos"}), 400
+    reserva_existente = Reserva.query.filter_by(
+        cancha_id=cancha_id, fecha=fecha, hora=hora
+    ).first()
+    if reserva_existente:
+        return jsonify({"error": "Ese horario ya está ocupado"}), 409
+    nueva_reserva = Reserva(
+        cancha_id=cancha_id,
+        fecha=fecha,
+        hora=hora,
+        user_id=int(current_user_id),
+        estado="pendiente"
+    )
+    db.session.add(nueva_reserva)
+    db.session.commit()
+    return jsonify(nueva_reserva.serialize()), 201
+
+
+@api.route('/reservas/<int:id>', methods=['PUT'])
+@jwt_required()
+def actualizar_reserva(id):
+    reserva = Reserva.query.get(id)
+    if not reserva:
+        return jsonify({"error": "Reserva no encontrada"}), 404
+    body = request.get_json()
+    reserva.estado = body.get('estado', reserva.estado)
+    db.session.commit()
+    return jsonify(reserva.serialize()), 200
+
 
 @api.route('/cancha', methods=['POST'])
 def add_cancha():
     body = request.get_json()
-    
-    # Validación básica de campos obligatorios
+
     nombre = body.get('nombre')
     complejo_id = body.get('complejo_id')
     categoria_id = body.get('categoria_id')
@@ -394,11 +450,11 @@ def add_cancha():
         nueva_cancha = Cancha(
             nombre=nombre,
             complejo_id=complejo_id,
-            categoria_id=categoria_id # Puede ser None si no se selecciona
+            categoria_id=categoria_id
         )
         db.session.add(nueva_cancha)
         db.session.commit()
-        
+
         return jsonify(nueva_cancha.serialize()), 201
     except Exception as e:
         db.session.rollback()
@@ -408,7 +464,7 @@ def add_cancha():
 @api.route('/cancha/<int:id>', methods=['DELETE'])
 def delete_cancha(id):
     cancha = Cancha.query.get(id)
-    
+
     if not cancha:
         return jsonify({"msg": "La cancha no existe"}), 404
 
@@ -419,4 +475,3 @@ def delete_cancha(id):
     except Exception as e:
         db.session.rollback()
         return jsonify({"msg": "Error al eliminar la cancha", "error": str(e)}), 500
-    
