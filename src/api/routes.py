@@ -107,7 +107,7 @@ def create_user():
             expires_delta=timedelta(hours=1)
         )
 
-        activation_link = f"{frontend_url}api/activate-account?token={activation_token}"
+        activation_link = f"{frontend_url}activate-account?token={activation_token}"
         email_body = f"""
         <div>
             <p>Hola {new_user.username},</p>
