@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams, useSearchParams, useNavigate } from "react-router-dom";
+import { useParams, useSearchParams, useNavigate, Link } from "react-router-dom";
 
 const Canchas = () => {
   const { id } = useParams();
@@ -26,7 +26,9 @@ const Canchas = () => {
       <h2 className="mb-2">{complejo ? complejo.name : "Cargando..."}</h2>
       <p className="text-muted mb-4">{categoria}</p>
       {canchas.length === 0 ? (
-        <p className="text-muted">No hay canchas disponibles.</p>
+        <div className="text-center py-5 bg-light rounded">
+          <p className="text-muted mb-0">No hay canchas disponibles en este complejo.</p>
+        </div>
       ) : (
         <div className="row g-3">
           {canchas.map(cancha => (
@@ -52,7 +54,6 @@ const Canchas = () => {
 };
 
 export default Canchas;
-
 
 
 

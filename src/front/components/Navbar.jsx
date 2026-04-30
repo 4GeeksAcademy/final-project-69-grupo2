@@ -42,8 +42,10 @@ export const Navbar = () => {
 
 
 					<Link className="nav-link text-white" to="/">Inicio</Link>
+
 					<Link className="nav-link text-white" to="/reservas">Reservas</Link>
-					<Link className="nav-link text-white" to="/registro">Registro</Link>
+
+					{!isAuthenticated && <Link className="nav-link text-white" to="/register">Registro</Link>}
 					<Link className="nav-link text-white" to="/add-complejo">
 
 						<i className="fa fa-plus me-1"></i> Añadir Complejo

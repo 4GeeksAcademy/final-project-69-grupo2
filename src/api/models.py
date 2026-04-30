@@ -54,7 +54,7 @@ class Complejo(db.Model):
     def serialize(self):
         return {
             "id": self.id,
-            "name": self.nombre,
+            "nombre": self.nombre,
             "email": self.email,
             "phone": self.phone,
             "address": self.address,
@@ -68,6 +68,24 @@ class Complejo(db.Model):
 
 class Cancha(db.Model):
     id: Mapped[int] = mapped_column(primary_key=True)
+    nombre: Mapped[str] = mapped_column(String(100), nullable=False)
+    precio_hora: Mapped[float] = mapped_column(db.Float, nullable=True)
+    foto_url: Mapped[str] = mapped_column(String(300), nullable=True)
+
+    # Nuevos campos para el horario general
+    hora_apertura: Mapped[str] = mapped_column(
+        String(10), nullable=True, default="08:00")
+    hora_cierre: Mapped[str] = mapped_column(
+        String(10), nullable=True, default="24:00")
+
+    complejo_id: Mapped[int] = mapped_column(db.ForeignKey("complejo.id"))
+    categoria_id: Mapped[int] = mapped_column(db.ForeignKey("categoria.id"))
+
+    # Relaciones
+    complejo: Mapped["Complejo"] = relationship(back_populates="canchas")
+    categoria: Mapped["Categoria"] = relationship()
+    reservas: Mapped[list["Reserva"]] = relationship(
+        back_populates="cancha", cascade="all, delete-orphan")
     nombre: Mapped[str] = mapped_column(String(120), nullable=False)
     complejo_id: Mapped[int] = mapped_column(db.ForeignKey("complejo.id"), nullable=False)
     categoria_id: Mapped[int] = mapped_column(db.ForeignKey("categoria.id"), nullable=True)
@@ -79,12 +97,30 @@ class Cancha(db.Model):
         return {
             "id": self.id,
             "nombre": self.nombre,
+            "precio_hora": self.precio_hora,
+            "foto_url": self.foto_url,
+            "hora_apertura": self.hora_apertura,
+            "hora_cierre": self.hora_cierre,
             "complejo_id": self.complejo_id,
+            "complejo_nombre": self.complejo.nombre if self.complejo else "Sin complejo",
+            "categoria_nombre": self.categoria.nombre if self.categoria else "Sin deporte",
             "categoria_nombre": self.categoria.nombre if self.categoria else "Sin categoría"
         }
 
 
 class Reserva(db.Model):
+    __tablename__ = 'reservas'
+    id: Mapped[int] = mapped_column(primary_key=True)
+    fecha: Mapped[str] = mapped_column(db.String(20), nullable=False)
+    hora: Mapped[str] = mapped_column(db.String(10), nullable=False)
+    es_bloqueo: Mapped[bool] = mapped_column(db.Boolean, default=False)
+
+    user_id: Mapped[int] = mapped_column(
+        db.ForeignKey("users.id"), nullable=True)
+    cancha_id: Mapped[int] = mapped_column(
+        db.ForeignKey("cancha.id"), nullable=False)
+
+    user: Mapped["User"] = relationship()
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(db.ForeignKey("users.id"), nullable=False)
     cancha_id: Mapped[int] = mapped_column(db.ForeignKey("cancha.id"), nullable=False)
@@ -96,9 +132,13 @@ class Reserva(db.Model):
     def serialize(self):
         return {
             "id": self.id,
-            "user_id": self.user_id,
-            "cancha_id": self.cancha_id,
             "fecha": self.fecha,
             "hora": self.hora,
-            "estado": self.estado
+            "es_bloqueo": self.es_bloqueo,
+            "user_id": self.user_id,
+            "cancha_id": self.cancha_id,
+            "cancha_nombre": self.cancha.nombre if self.cancha else None,
+            "complejo_nombre": self.cancha.complejo.nombre if self.cancha and self.cancha.complejo else None,
+            "complejo_id": self.cancha.complejo_id if self.cancha else None,
+             "estado": self.estado
         }

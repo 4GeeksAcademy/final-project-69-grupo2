@@ -1,86 +1,70 @@
+
+
 import React from "react";
 import { Link } from 'react-router-dom';
 
 const ContactComplejoDeportivo = ({ complejo, onDelete }) => {
+    // Imagen de marcador de posición si no hay imagen_url
+    const defaultImage = "https://placeholder.com"; 
+
     return (
-        <li className="list-group-item d-flex justify-content-center">
-            <div className="d-flex align-items-center w-75">
-                <div className="col-md-3 d-flex justify-content-center">
+        <li className="list-group-item d-flex justify-content-center border-bottom py-3">
+            <div className="d-flex align-items-center w-100">
+                {/* Contenedor de la Foto */}
+                <div className="col-md-2 d-flex justify-content-center">
                     <img 
-                        className="rounded" 
-                        src={complejo.imagen_url || "https://placeholder.com"} 
-                        alt="Logo" 
-                        style={{ width: "100px", height: "100px", objectFit: "cover" }}
+                        className="rounded-circle border shadow-sm" 
+                        src={complejo.imagen_url || defaultImage} 
+                        alt="Logo Complejo" 
+                        style={{ width: "80px", height: "80px", objectFit: "cover" }}
                     />
                 </div>
                 
-                <div className="col-md-6">
-                    <h5 className="card-title mb-1 text-primary">{complejo.name}</h5>
-                    <p className="card-text mb-1 text-secondary">
-                        <i className="fa fa-map-marker me-2"></i>{complejo.address}
+                {/* Información Central */}
+                <div className="col-md-6 px-3">
+                    {/* Cambiado: ahora usa .nombre para coincidir con tu base de datos */}
+                    <h5 className="mb-1 text-primary fw-bold">{complejo.nombre}</h5>
+                    
+                    {/* Ubicación: Ciudad y País */}
+                    <p className="mb-1 text-muted fw-bold small">
+                        <i className="fa fa-globe me-2"></i>{complejo.city}, {complejo.country}
                     </p>
-                    <p className="card-text mb-1 text-secondary">
-                        <i className="fa fa-phone me-2"></i>{complejo.phone}
-                    </p>
-                    <p className="card-text mb-1 text-secondary">
-                        <i className="fa fa-envelope me-2"></i>{complejo.email}
-                    </p>
-       
-                    <p className="mb-1 text-muted">
-                        <small><i className="fa fa-globe me-2"></i>{complejo.city}, {complejo.country}</small>
+
+                    {/* Dirección Física */}
+                    <p className="mb-1 text-secondary small">
+                        <i className="fa fa-map-marker-alt me-2 text-danger"></i>{complejo.address}
                     </p>
                     
+                    {/* Datos de contacto */}
+                    <div className="d-flex flex-wrap gap-3">
+                        <small className="text-muted"><i className="fa fa-phone me-1"></i>{complejo.phone}</small>
+                        <small className="text-muted"><i className="fa fa-envelope me-1"></i>{complejo.email}</small>
+                    </div>
+                    
+                    {/* Link de Google Maps dinámico */}
                     {complejo.google_map && (
                         <a 
                             href={complejo.google_map.startsWith('http') ? complejo.google_map : `https://${complejo.google_map}`} 
                             target="_blank" 
                             rel="noopener noreferrer" 
-                            className="btn btn-sm btn-outline-info mt-2"
+                            className="btn btn-sm btn-link p-0 text-info mt-1 text-decoration-none"
                         >
-                            <i className="fa fa-external-link-alt me-1"></i> Ver en Google Maps
+                            <i className="fa fa-map me-1"></i> Ver ubicación
                         </a>
                     )}
                 </div>
-                 <Link to={`/complejo/${complejo.id}/add-cancha`} className="btn btn-outline-success btn-sm">
-                    <i className="fa fa-futbol me-1"></i> Canchas
-                </Link>
 
-                <div className="col-md-3 d-flex justify-content-end align-items-start">
-                    <Link to={`/add-complejo/${complejo.id}`} className="btn btn-link p-0 me-3 text-dark">
-                        <i className="fa fa-pencil fa-lg"></i>
+                {/* Acciones del Administrador */}
+                <div className="col-md-4 d-flex justify-content-end align-items-center gap-2">
+                    {/* Botón para ir a la gestión de canchas de este complejo */}
+                    <Link to={`/complejo/${complejo.id}/add-cancha`} className="btn btn-outline-success btn-sm rounded-pill">
+                        <i className="fa fa-futbol me-1"></i> Cargar Canchas
                     </Link>
-                    <button 
-                        type="button" 
-                        className="btn btn-link p-0 text-danger" 
-                        data-bs-toggle="modal" 
-                        data-bs-target={`#delete-${complejo.id}`}
-                    >
-                        <i className="fa fa-trash fa-lg"></i>
-                    </button>
-                </div>
-            </div>
-
-            {/* Modal de confirmación */}
-            <div className="modal fade" id={`delete-${complejo.id}`} tabIndex="-1" aria-hidden="true">
-                <div className="modal-dialog">
-                    <div className="modal-content">
-                        <div className="modal-header">
-                            <h5 className="modal-title">¿Eliminar {complejo.name}?</h5>
-                        </div>
-                        <div className="modal-body">
-                            Esta acción no se puede deshacer y borrará toda la información asociada.
-                        </div>
-                        <div className="modal-footer">
-                            <button className="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                            <button 
-                                className="btn btn-danger" 
-                                data-bs-dismiss="modal" 
-                                onClick={() => onDelete(complejo.id)}
-                            >
-                                Sí, eliminar complejo
-                            </button>
-                        </div>
-                    </div>
+                    
+                    {/* Botón para editar el complejo */}
+                    <Link to={`/add-complejo/${complejo.id}`} className="btn btn-outline-secondary btn-sm rounded-pill">
+                        <i className="fa fa-pencil-alt"></i> Actualizar Datos
+                    </Link>
                 </div>
             </div>
         </li>

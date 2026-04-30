@@ -68,7 +68,27 @@ const Complejos = () => {
                 style={{ width: "100%", height: "200px", objectFit: "cover" }} alt={complejo.nombre} />
               <div className="p-3">
                 <h5 style={{ fontWeight: 700, marginBottom: "4px" }}>{complejo.nombre}</h5>
-                <p className="text-muted small mb-1">📍 Colombia</p>
+                <p className="text-muted small mb-2">
+                  📍 {complejo.city || complejo.address || "Ubicación no disponible"}
+                </p>
+                {complejo.phone && (
+                  <p className="text-muted small mb-2">
+                    📞 {complejo.phone}
+                  </p>
+                )}
+                {complejo.email && (
+                  <p className="text-muted small mb-2">
+                    ✉️ {complejo.email}
+                  </p>
+                )}
+                <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap", marginBottom: "8px" }}>
+                  {complejo.google_map && (
+                    <a href={complejo.google_map} target="_blank" rel="noopener noreferrer"
+                      style={{ display: "inline-flex", alignItems: "center", gap: "4px", color: "#7cba00", fontWeight: 600, fontSize: "12px", textDecoration: "none" }}>
+                      🗺️ Google Maps
+                    </a>
+                  )}
+                </div>
                 <span style={{ background: "#f0fad0", color: "#3a7a00", fontSize: "12px", padding: "2px 10px", borderRadius: "20px" }}>
                   {complejo.categoria}
                 </span>
