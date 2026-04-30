@@ -42,9 +42,9 @@ export const Navbar = () => {
 
 
 					<Link className="nav-link text-white" to="/">Inicio</Link>
-					<Link className="nav-link text-white" to="/">Actividades</Link>
-					 <Link className="nav-link text-white" to="/reservas">Reservas</Link> 
-					<Link className="nav-link text-white" to="/">Eventos</Link>
+
+					<Link className="nav-link text-white" to="/reservas">Reservas</Link>
+
 					{!isAuthenticated && <Link className="nav-link text-white" to="/register">Registro</Link>}
 					<Link className="nav-link text-white" to="/add-complejo">
 
@@ -78,7 +78,7 @@ export const Navbar = () => {
 					<button
 						className="btn"
 						style={{ background: "#C8F135", color: "#111", fontWeight: 600, padding: "8px 20px", borderRadius: "8px" }}
-						onClick={() => navigate("/reservas")}
+						onClick={() => navigate("/todos-complejos")}
 					>
 						RESERVAR CANCHA
 					</button>
