@@ -71,7 +71,8 @@ def create_user():
         try:
             uploaded_result = cloudinary_upload.upload(
                 avatar_file, folder="avatars")
-            avatar_url = uploaded_result.get("secure_url", "https://i.pravatar.cc/300")
+            avatar_url = uploaded_result.get(
+                "secure_url", "https://i.pravatar.cc/300")
         except Exception as e:
             return jsonify({"error": f"Error uploading avatar: {str(e)}"}), 500
 
@@ -430,6 +431,8 @@ def get_cancha(id):
     if not cancha:
         return jsonify({"msg": "Cancha no encontrada"}), 404
     return jsonify(cancha.serialize()), 200
+
+
 @api.route('/reservas/horarios', methods=['GET'])
 def get_horarios():
     cancha_id = request.args.get('cancha_id')
@@ -557,12 +560,21 @@ def add_reserva():
         if not user:
             return jsonify({"error": "Usuario no encontrado"}), 404
 
+    reserva_existente = Reserva.query.filter_by(
+        cancha_id=data.get("cancha_id"),
+        fecha=data.get("fecha"),
+        hora=data.get("hora")
+    ).first()
+    if reserva_existente:
+        return jsonify({"error": "Ese horario ya está ocupado"}), 409
+
     nueva_reserva = Reserva(
         fecha=data.get("fecha"),
         hora=data.get("hora"),
         cancha_id=data.get("cancha_id"),
         es_bloqueo=es_bloqueo,
-        user_id=user_id
+        user_id=user_id,
+        estado="pendiente"
     )
 
     try:
