@@ -51,12 +51,13 @@ def create_user():
     data_files = request.files
     data = {**data_form, **data_files}
 
-    for field in ["email", "username", "password"]:
+    for field in ["email", "username", "full_name", "password"]:
         if not data.get(field):
             return jsonify({"error": f"Missing required field: {field}"}), 400
 
     email = data["email"].strip().lower()
     username = data["username"].strip()
+    full_name = data["full_name"].strip()
     password = data["password"].strip()
     avatar_file = data.get("avatar_url")
 
@@ -92,7 +93,8 @@ def create_user():
             password=hashed_password,
             salt=salt,
             is_active=False,
-            avatar_url=avatar_url)
+            avatar_url=avatar_url,
+            full_name=full_name)
 
         db.session.add(new_user)
         db.session.flush()

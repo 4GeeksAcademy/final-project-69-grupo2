@@ -5,6 +5,7 @@ import { registerUser } from "../services/user.services"
 const initialStateUser = {
     email: "",
     username: "",
+    full_name: "",
     password: "",
     avatar: null
 }
@@ -31,6 +32,7 @@ export const Register = () => {
         let formData = new FormData(); // esto es una instancia de formulario de data de javascript
         formData.append("email", user.email);
         formData.append("username", user.username);
+        formData.append("full_name", user.full_name);
         formData.append("password", user.password);
         formData.append("avatar_url", user.avatar);
 
@@ -62,7 +64,7 @@ export const Register = () => {
         }, 3000)
 
         return () => clearTimeout(timeoutId)
-    }, [])
+    }, [success])
 
     return (
         <>
@@ -97,6 +99,18 @@ export const Register = () => {
                                     placeholder="Enter your username"
                                     name="username"
                                     value={user.username}
+                                    onChange={handleChange}
+                                />
+                            </div>
+                            <div className="mb-3 form-group">
+                                <label htmlFor="full_name" className="form-label">Full Name</label>
+                                <input
+                                    type="text"
+                                    className="form-control"
+                                    id="full_name"
+                                    placeholder="Enter your full name"
+                                    name="full_name"
+                                    value={user.full_name}
                                     onChange={handleChange}
                                 />
                             </div>

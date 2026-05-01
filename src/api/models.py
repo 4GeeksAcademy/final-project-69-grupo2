@@ -1,10 +1,18 @@
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import String, Boolean, DateTime, func
 from datetime import datetime
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship, declarative_base
+import enum
 
 db = SQLAlchemy()
 
+Base = declarative_base()
+
+
+class Role(enum.Enum):
+    SUPER_ADMIN = "super_admin"
+    ADMIN = "admin"
+    USER = "user"
 
 class User(db.Model):
     __tablename__ = "users"
@@ -12,6 +20,8 @@ class User(db.Model):
     email: Mapped[str] = mapped_column(
         String(120), unique=True, nullable=False)
     username: Mapped[str] = mapped_column(String(120), nullable=False)
+    full_name: Mapped[str] = mapped_column(String(120), nullable=True)
+    role: Mapped[Role] = mapped_column(db.Enum(Role), default=Role.USER, nullable=False)
     password: Mapped[str] = mapped_column(nullable=False)
     salt: Mapped[str] = mapped_column(String(120), nullable=False)
     avatar_url: Mapped[str] = mapped_column(
@@ -27,7 +37,9 @@ class User(db.Model):
         return {
             "id": self.id,
             "username": self.username,
+            "full_name": self.full_name,
             "email": self.email,
+            "role": self.role.value,
             "avatar_url": self.avatar_url,
             "is_active": self.is_active
         }
