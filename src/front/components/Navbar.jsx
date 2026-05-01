@@ -8,6 +8,10 @@ export const Navbar = () => {
 	const { store, dispatch } = useGlobalReducer();
 	const isAuthenticated = Boolean(store?.auth?.isAuthenticated);
 	const user = store?.auth?.user;
+	const role = String(user?.role || "user").toLowerCase();
+	const isAdmin = role === "admin";
+	const isSuperAdmin = role === "super_admin";
+	const isGeneralUser = role === "user";
 	const avatarUrl = user?.avatar_url;
 	const avatarFallback = (user?.username?.[0] || user?.email?.[0] || "U").toUpperCase();
 
@@ -42,14 +46,15 @@ export const Navbar = () => {
 
 
 					<Link className="nav-link text-white" to="/">Inicio</Link>
-					<Link className="nav-link text-white" to="/">Actividades</Link>
-					<Link className="nav-link text-white" to="/reservas">Reservas</Link>
-					<Link className="nav-link text-white" to="/">Eventos</Link>
-					{!isAuthenticated && <Link className="nav-link text-white" to="/register">Registro</Link>}
-					<Link className="nav-link text-white" to="/add-complejo">
 
-						<i className="fa fa-plus me-1"></i> Añadir Complejo
-					</Link>
+					<Link className="nav-link text-white" to="/reservas">Reservas</Link>
+
+					{!isAuthenticated && <Link className="nav-link text-white" to="/register">Registro</Link>}
+					{isAdmin && isAuthenticated && (
+						<Link className="nav-link text-white" to="/add-complejo">
+							<i className="fa fa-plus me-1"></i> Añadir Complejo
+						</Link>
+					)}
 					<div className="dropdown">
 						<button
 							className="btn nav-link text-white dropdown-toggle"
@@ -75,10 +80,43 @@ export const Navbar = () => {
 						</ul>
 					</div>
 
+					{isAuthenticated && (
+						<div class="dropdown me-1">
+							<button type="button" class="btn btn-secondary dropdown-toggle" id="dropdownMenuOffset" data-bs-toggle="dropdown" aria-expanded="false" data-bs-offset="10,20">
+								Opciones de Usuario
+							</button>
+
+							{isSuperAdmin && (
+								<ul class="dropdown-menu" aria-labelledby="dropdownMenuOffset">
+									<li><a class="dropdown-item" href="#">Gestionar Complejos</a></li>
+									<li><a class="dropdown-item" href="#">Reporte de Reservas</a></li>
+									<li><a class="dropdown-item" href="#">Confirmación de Reservas</a></li>
+									<li><a class="dropdown-item" href="#">Gestionar Usuarios</a></li>
+								</ul>
+							)}
+
+							{isAdmin && (
+								<ul class="dropdown-menu" aria-labelledby="dropdownMenuOffset">
+									<li><a class="dropdown-item" href="#">Gestionar Complejos</a></li>
+									<li><a class="dropdown-item" href="#">Reporte de Reservas</a></li>
+									<li><a class="dropdown-item" href="#">Confirmación de Reservas</a></li>
+								</ul>
+							)}
+
+							{isGeneralUser && (
+								<ul class="dropdown-menu" aria-labelledby="dropdownMenuOffset">
+									<li><a class="dropdown-item" href="#">Mis Reservas</a></li>
+									<li><a class="dropdown-item" href="#">Registro de Complejo</a></li>
+								</ul>
+							)}
+
+						</div>
+					)}
+
 					<button
 						className="btn"
 						style={{ background: "#C8F135", color: "#111", fontWeight: 600, padding: "8px 20px", borderRadius: "8px" }}
-						onClick={() => navigate("/reservas")}
+						onClick={() => navigate("/todos-complejos")}
 					>
 						RESERVAR CANCHA
 					</button>

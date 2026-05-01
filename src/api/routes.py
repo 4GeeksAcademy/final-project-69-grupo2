@@ -4,7 +4,7 @@ This module takes care of starting the API Server, Loading the DB and Adding the
 from flask import Flask, request, jsonify, url_for, Blueprint
 from sqlalchemy.exc import IntegrityError
 from api.utils import generate_sitemap, APIException, validate_email, send_email
-from api.models import db, User, Categoria, Complejo, Cancha
+from api.models import db, User, Categoria, Complejo, Cancha, Reserva
 from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
 from base64 import b64encode
@@ -22,26 +22,26 @@ MAX_IMG_SIZE = 2 * 1024 * 1024  # 2MB
 
 
 def _resolve_avatar_url(avatar_file):
+    # Primero verificar si existe o es string vacío
+    if not avatar_file or isinstance(avatar_file, str):
+        return "https://i.pravatar.cc/300"
+
     if avatar_file.mimetype not in ALLOWED_IMG_EXTENSIONS:
         raise ValueError(
             "Invalid image format. Allowed formats: PNG, JPG, JPEG, GIF, WEBP")
-
-    if len(avatar_file.read()) > MAX_IMG_SIZE:
-        raise ValueError("Image size exceeds the maximum limit of 2MB")
-
-    if not avatar_file:
-        return "https://i.pravatar.cc/300"
 
     avatar_file.stream.seek(0, 2)
     file_size = avatar_file.stream.tell()
     avatar_file.stream.seek(0)
 
-    return "https://i.pravatar.cc/300"
+    if file_size > MAX_IMG_SIZE:
+        raise ValueError("Image size exceeds the maximum limit of 2MB")
+
+    return None  # Señal de que hay archivo válido para subir a Cloudinary
 
 
 @api.route('/health-check', methods=["GET"])
 def health_check():
-
     return jsonify({"status": "Ok"}), 200
 
 
@@ -51,23 +51,29 @@ def create_user():
     data_files = request.files
     data = {**data_form, **data_files}
 
-    for field in ["email", "username", "password"]:
+    for field in ["email", "username", "full_name", "password"]:
         if not data.get(field):
             return jsonify({"error": f"Missing required field: {field}"}), 400
 
     email = data["email"].strip().lower()
     username = data["username"].strip()
+    full_name = data["full_name"].strip()
     password = data["password"].strip()
     avatar_file = data.get("avatar_url")
-    avatar_url = _resolve_avatar_url(avatar_file)
 
-    if avatar_file:
+    try:
+        avatar_url = _resolve_avatar_url(avatar_file)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
+    # Si hay archivo válido (avatar_url es None), subir a Cloudinary
+    if avatar_file and avatar_url is None:
         try:
             uploaded_result = cloudinary_upload.upload(
                 avatar_file, folder="avatars")
-            avatar = uploaded_result.get("secure_url", avatar_url)
-        except ValueError as e:
-            return jsonify({"error": str(e)}), 500
+            avatar_url = uploaded_result.get("secure_url", "https://i.pravatar.cc/300")
+        except Exception as e:
+            return jsonify({"error": f"Error uploading avatar: {str(e)}"}), 500
 
     valid_email = validate_email(email)
     if not valid_email:
@@ -77,16 +83,17 @@ def create_user():
         return jsonify({"error": "Email already exists"}), 400
 
     salt = b64encode(os.urandom(32)).decode('utf-8')
-    password = generate_password_hash(password+salt)
+    hashed_password = generate_password_hash(password + salt)
 
     try:
         new_user = User(
             email=email,
             username=username,
-            password=password,
+            password=hashed_password,
             salt=salt,
             is_active=False,
-            avatar_url=avatar)
+            avatar_url=avatar_url,
+            full_name=full_name)
 
         db.session.add(new_user)
         db.session.flush()
@@ -94,7 +101,7 @@ def create_user():
         frontend_url = (os.getenv("URL_FRONTEND") or "").strip()
         if not frontend_url:
             db.session.rollback()
-            return jsonify({"error": "El URL_FRONTEND is required"}), 500
+            return jsonify({"error": "URL_FRONTEND is required"}), 500
 
         activation_token = create_access_token(
             identity=str(new_user.id),
@@ -107,7 +114,7 @@ def create_user():
         <div>
             <p>Hola {new_user.username},</p>
             <p>Bienvenido! Por favor activa tu cuenta ingresando al siguiente enlace:</p>
-            <a href=\"{activation_link}\">Activar cuenta</a>
+            <a href="{activation_link}">Activar cuenta</a>
             <p>If you did not create this account, you can ignore this email.</p>
         </div>
         """
@@ -131,6 +138,7 @@ def create_user():
         db.session.rollback()
         return jsonify({"error": "Database integrity error: " + str(e)}), 409
     except Exception as e:
+        db.session.rollback()
         return jsonify({"error": "An error occurred while creating the user"}), 500
 
 
@@ -193,9 +201,12 @@ def reset_password():
     if not user:
         return jsonify({"error": "If email exists, a password reset email will be sent"}), 404
 
-    reset_token = create_access_token(identity=str(
-        user.id), additional_claims={"purpose": "password-reset"}, expires_delta=timedelta(minutes=10))
-    frontend_url = os.getenv("URL_FRONTEND" or "").strip()
+    reset_token = create_access_token(
+        identity=str(user.id),
+        additional_claims={"purpose": "password-reset"},
+        expires_delta=timedelta(minutes=10)
+    )
+    frontend_url = (os.getenv("URL_FRONTEND") or "").strip()
 
     if not frontend_url:
         return jsonify({"error": "Frontend URL is not configured"}), 500
@@ -222,9 +233,9 @@ def reset_password():
         if success:
             return jsonify({"message": "Email sending success"}), 200
         else:
-            return jsonify({"error": "Error sended message"})
+            return jsonify({"error": "Error sending message"}), 500
     except Exception as error:
-        return jsonify({"error": f"Error sending email: {error.args}"})
+        return jsonify({"error": f"Error sending email: {error.args}"}), 500
 
 
 @api.route("/update-pwd", methods=["POST"])
@@ -232,7 +243,7 @@ def reset_password():
 def update_password():
     claims = get_jwt()
     if claims.get("purpose") != "password-reset":
-        return jsonify({"error": "Invalid tokoken for password update"}), 403
+        return jsonify({"error": "Invalid token for password update"}), 403
 
     user_id = get_jwt_identity()
     user = User.query.get(user_id)
@@ -244,18 +255,17 @@ def update_password():
     new_password = data.get("new_password", "")
 
     if not new_password:
-        return jsonify({"error": "Misssing required field: new_password"}), 400
+        return jsonify({"error": "Missing required field: new_password"}), 400
 
     salt = b64encode(os.urandom(32)).decode("utf-8")
-    user.password = generate_password_hash(new_password+salt)
+    user.password = generate_password_hash(new_password + salt)
     user.salt = salt
 
     try:
         db.session.commit()
-        return jsonify({"message": "password updated successfully"}), 200
+        return jsonify({"message": "Password updated successfully"}), 200
     except Exception as error:
         db.session.rollback()
-        print(error.args)
         return jsonify({"error": f"Error updating password: {error.args}"}), 500
 
 
@@ -265,21 +275,20 @@ def activate_account():
     token = (data.get("token") or request.args.get("token") or "").strip()
 
     if not token:
-        return jsonify({"error": "Missing required field. token"}), 400
+        return jsonify({"error": "Missing required field: token"}), 400
 
     try:
         decoded = decode_token(token)
-
     except Exception as error:
-        return jsonify({"error": f"Invalid token or expired token: {error.args}"}), 400
+        return jsonify({"error": f"Invalid or expired token: {error.args}"}), 400
 
     if decoded.get("purpose") != "account_activation":
-        return jsonify({"error": "Ivalid token purpose"}), 403
+        return jsonify({"error": "Invalid token purpose"}), 403
 
     user_id = decoded.get("sub")
     user = User.query.get(user_id)
     if not user:
-        return jsonify({"error": "user not found"}), 404
+        return jsonify({"error": "User not found"}), 404
 
     if user.is_active:
         return jsonify({"message": "User already activated"}), 200
@@ -321,39 +330,76 @@ def get_complejo(id):
 
 @api.route('/complejo', methods=['POST'])
 def add_complejo():
-    body = request.get_json()
-    nuevo_complejo = Complejo(
-        nombre=body.get('name'),
-        email=body.get('email'),
-        phone=body.get('phone'),
-        address=body.get('address'),
-        country=body.get('country'),
-        city=body.get('city'),
-        google_map=body.get('google_map'),
-        categoria_id=body.get('categoria_id')
-    )
-    db.session.add(nuevo_complejo)
-    db.session.commit()
-    return jsonify({"msg": "Complejo creado", "id": nuevo_complejo.id}), 201
+    # Recibimos del FormData (Frontend usa 'name')
+    nombre = request.form.get("name")
+    email = request.form.get("email")
+    phone = request.form.get("phone")
+    address = request.form.get("address")
+    country = request.form.get("country")
+    city = request.form.get("city")
+    google_map = request.form.get("google_map")
+
+    image_file = request.files.get("image")
+    url_cloudinary = None
+
+    if image_file:
+        try:
+            upload_result = cloudinary_upload.upload(
+                image_file, folder="complejos")
+            url_cloudinary = upload_result.get("secure_url")
+        except Exception as e:
+            return jsonify({"error": f"Error Cloudinary: {str(e)}"}), 500
+
+    try:
+        nuevo_complejo = Complejo(
+            nombre=nombre,  # Usamos 'nombre' como dice tu clase
+            email=email,
+            phone=phone,
+            address=address,
+            country=country,
+            city=city,
+            google_map=google_map,
+            imagen_url=url_cloudinary  # Usamos 'imagen_url' como dice tu clase
+        )
+        db.session.add(nuevo_complejo)
+        db.session.commit()
+        return jsonify(nuevo_complejo.serialize()), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
 
 
 @api.route('/complejo/<int:id>', methods=['PUT'])
 def update_complejo(id):
     complejo = Complejo.query.get(id)
     if not complejo:
-        return jsonify({"msg": "No existe"}), 404
-    body = request.get_json()
+        return jsonify({"error": "Complejo no encontrado"}), 404
 
-    complejo.nombre = body.get('name', complejo.nombre)
-    complejo.email = body.get('email', complejo.email)
-    complejo.phone = body.get('phone', complejo.phone)
-    complejo.address = body.get('address', complejo.address)
-    complejo.country = body.get('country', complejo.country)
-    complejo.city = body.get('city', complejo.city)
-    complejo.google_map = body.get('google_map', complejo.google_map)
+    # IMPORTANTE: Usar los nombres exactos de tu modelo (nombre, country, city, etc.)
+    complejo.nombre = request.form.get("name", complejo.nombre)
+    complejo.email = request.form.get("email", complejo.email)
+    complejo.phone = request.form.get("phone", complejo.phone)
+    complejo.address = request.form.get("address", complejo.address)
+    complejo.country = request.form.get("country", complejo.country)
+    complejo.city = request.form.get("city", complejo.city)
+    complejo.google_map = request.form.get("google_map", complejo.google_map)
 
-    db.session.commit()
-    return jsonify(complejo.serialize()), 200
+    image_file = request.files.get("image")
+    if image_file:
+        try:
+            upload_result = cloudinary_upload.upload(
+                image_file, folder="complejos")
+            complejo.imagen_url = upload_result.get(
+                "secure_url")  # Nombre correcto
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    try:
+        db.session.commit()
+        return jsonify(complejo.serialize()), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
 
 
 @api.route('/complejo/<int:id>', methods=['DELETE'])
@@ -369,46 +415,105 @@ def delete_complejo(id):
 @api.route('/canchas', methods=['GET'])
 def get_canchas():
     complejo_id = request.args.get('complejo_id')
-    
-    # Si hay ID, filtramos. Si no hay, traemos todas (o una lista vacía)
+
     if complejo_id:
         canchas = Cancha.query.filter_by(complejo_id=complejo_id).all()
     else:
-        canchas = Cancha.query.all() # O [] si prefieres
-        
+        canchas = Cancha.query.all()
+
     return jsonify([c.serialize() for c in canchas]), 200
+
+
+@api.route('/cancha/<int:id>', methods=['GET'])
+def get_cancha(id):
+    cancha = Cancha.query.get(id)
+    if not cancha:
+        return jsonify({"msg": "Cancha no encontrada"}), 404
+    return jsonify(cancha.serialize()), 200
+@api.route('/reservas/horarios', methods=['GET'])
+def get_horarios():
+    cancha_id = request.args.get('cancha_id')
+    fecha = request.args.get('fecha')
+    if not cancha_id or not fecha:
+        return jsonify({"error": "Faltan parámetros"}), 400
+    reservas = Reserva.query.filter_by(cancha_id=cancha_id, fecha=fecha).all()
+    ocupados = [r.hora for r in reservas]
+    return jsonify({"ocupados": ocupados}), 200
+
+
+@api.route('/reservas', methods=['POST'])
+@jwt_required()
+def crear_reserva():
+    current_user_id = get_jwt_identity()
+    body = request.get_json()
+    cancha_id = body.get('cancha_id')
+    fecha = body.get('fecha')
+    hora = body.get('hora')
+    if not cancha_id or not fecha or not hora:
+        return jsonify({"error": "Faltan campos requeridos"}), 400
+    reserva_existente = Reserva.query.filter_by(
+        cancha_id=cancha_id, fecha=fecha, hora=hora
+    ).first()
+    if reserva_existente:
+        return jsonify({"error": "Ese horario ya está ocupado"}), 409
+    nueva_reserva = Reserva(
+        cancha_id=cancha_id,
+        fecha=fecha,
+        hora=hora,
+        user_id=int(current_user_id),
+        estado="pendiente"
+    )
+    db.session.add(nueva_reserva)
+    db.session.commit()
+    return jsonify(nueva_reserva.serialize()), 201
+
+
+@api.route('/reservas/<int:id>', methods=['PUT'])
+@jwt_required()
+def actualizar_reserva(id):
+    reserva = Reserva.query.get(id)
+    if not reserva:
+        return jsonify({"error": "Reserva no encontrada"}), 404
+    body = request.get_json()
+    reserva.estado = body.get('estado', reserva.estado)
+    db.session.commit()
+    return jsonify(reserva.serialize()), 200
+
 
 @api.route('/cancha', methods=['POST'])
 def add_cancha():
-    body = request.get_json()
-    
-    # Validación básica de campos obligatorios
-    nombre = body.get('nombre')
-    complejo_id = body.get('complejo_id')
-    categoria_id = body.get('categoria_id')
+    nombre = request.form.get("nombre")
+    complejo_id = request.form.get("complejo_id")
+    categoria_id = request.form.get("categoria_id")
+    precio_hora = request.form.get("precio_hora")
 
-    if not nombre or not complejo_id:
-        return jsonify({"msg": "Faltan datos obligatorios: nombre o complejo_id"}), 400
+    image_file = request.files.get("image")
+    url_cloudinary = None
+
+    if image_file:
+        upload_result = cloudinary_upload.upload(image_file, folder="canchas")
+        url_cloudinary = upload_result.get("secure_url")
 
     try:
         nueva_cancha = Cancha(
             nombre=nombre,
             complejo_id=complejo_id,
-            categoria_id=categoria_id # Puede ser None si no se selecciona
+            categoria_id=categoria_id,
+            precio_hora=float(precio_hora) if precio_hora else None,
+            foto_url=url_cloudinary
         )
         db.session.add(nueva_cancha)
         db.session.commit()
-        
         return jsonify(nueva_cancha.serialize()), 201
     except Exception as e:
         db.session.rollback()
-        return jsonify({"msg": "Error al crear la cancha", "error": str(e)}), 500
+        return jsonify({"error": str(e)}), 500
 
 
 @api.route('/cancha/<int:id>', methods=['DELETE'])
 def delete_cancha(id):
     cancha = Cancha.query.get(id)
-    
+
     if not cancha:
         return jsonify({"msg": "La cancha no existe"}), 404
 
@@ -419,4 +524,66 @@ def delete_cancha(id):
     except Exception as e:
         db.session.rollback()
         return jsonify({"msg": "Error al eliminar la cancha", "error": str(e)}), 500
-    
+
+    # Obtener todas las reservas de una cancha específica
+
+
+@api.route('/reservas/<int:cancha_id>', methods=['GET'])
+def get_reservas_cancha(cancha_id):
+    reservas = Reserva.query.filter_by(cancha_id=cancha_id).all()
+    return jsonify([res.serialize() for res in reservas]), 200
+
+# Crear una nueva reserva o un bloqueo
+
+
+@api.route('/reserva', methods=['POST'])
+def add_reserva():
+    data = request.get_json()
+
+    # Validamos datos mínimos
+    if not data.get("fecha") or not data.get("hora") or not data.get("cancha_id"):
+        return jsonify({"error": "Faltan datos obligatorios: fecha, hora, cancha_id"}), 400
+
+    es_bloqueo = data.get("es_bloqueo", False)
+    user_id = data.get("user_id")
+
+    # Si no es bloqueo, user_id es obligatorio
+    if not es_bloqueo and not user_id:
+        return jsonify({"error": "user_id es requerido para reservas de usuarios"}), 400
+
+    # Si se proporciona user_id, verificar que exista
+    if user_id:
+        user = User.query.get(user_id)
+        if not user:
+            return jsonify({"error": "Usuario no encontrado"}), 404
+
+    nueva_reserva = Reserva(
+        fecha=data.get("fecha"),
+        hora=data.get("hora"),
+        cancha_id=data.get("cancha_id"),
+        es_bloqueo=es_bloqueo,
+        user_id=user_id
+    )
+
+    try:
+        db.session.add(nueva_reserva)
+        db.session.commit()
+        return jsonify(nueva_reserva.serialize()), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+
+@api.route('/reserva/<int:id>', methods=['DELETE'])
+def delete_reserva(id):
+    reserva = Reserva.query.get(id)
+    if not reserva:
+        return jsonify({"msg": "La reserva o bloqueo no existe"}), 404
+
+    try:
+        db.session.delete(reserva)
+        db.session.commit()
+        return jsonify({"msg": "Horario liberado correctamente"}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500

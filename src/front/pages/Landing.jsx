@@ -130,8 +130,23 @@ const Landing = () => {
                     </div>
                     <div className="p-3">
                       <h5 style={{ fontWeight: 700, marginBottom: "4px" }}>{complejo.nombre}</h5>
-                      <p className="text-muted small mb-2">📍 Ubicación Ciudad</p>
-                      <p style={{ color: "#7cba00", fontWeight: 600, fontSize: "13px", margin: 0 }}>Ver más detalles →</p>
+                      <p className="text-muted small mb-2">
+                        📍 {complejo.city || complejo.address || "Ubicación no disponible"}
+                      </p>
+                      {complejo.phone && (
+                        <p className="text-muted small mb-2">
+                          📞 {complejo.phone}
+                        </p>
+                      )}
+                      <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                        {complejo.google_map && (
+                          <a href={complejo.google_map} target="_blank" rel="noopener noreferrer"
+                            style={{ display: "inline-flex", alignItems: "center", gap: "4px", color: "#7cba00", fontWeight: 600, fontSize: "12px", textDecoration: "none" }}>
+                            🗺️ Google Maps
+                          </a>
+                        )}
+                        <p style={{ color: "#7cba00", fontWeight: 600, fontSize: "13px", margin: 0 }}>Ver más →</p>
+                      </div>
                     </div>
                   </div>
                 </div>
