@@ -1,3 +1,5 @@
+// 
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -18,8 +20,15 @@ const Complejos = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    fetch(import.meta.env.VITE_BACKEND_URL + "/api/complejos").then(r => r.json()).then(setComplejos);
-    fetch(import.meta.env.VITE_BACKEND_URL + "/api/categorias").then(r => r.json()).then(setCategorias);
+    fetch(import.meta.env.VITE_BACKEND_URL + "/api/complejos")
+      .then(r => r.json())
+      .then(setComplejos)
+      .catch(err => console.error("Error complejos:", err));
+      
+    fetch(import.meta.env.VITE_BACKEND_URL + "/api/categorias")
+      .then(r => r.json())
+      .then(setCategorias)
+      .catch(err => console.error("Error categorías:", err));
   }, []);
 
   const ciudades = ["Todas", ...new Set(complejos.map(c => c.city).filter(Boolean))];
@@ -51,13 +60,14 @@ const Complejos = () => {
 
   const btnStyle = (activo) => ({
     background: activo ? "#3B6D11" : "transparent",
-    color: activo ? "#EAF3DE" : "var(--color-text-secondary)",
+    color: activo ? "#EAF3DE" : "#666",
     border: "0.5px solid #ccc",
     borderRadius: "20px",
     padding: "4px 12px",
     fontSize: "12px",
     cursor: "pointer",
-    margin: "3px 2px"
+    margin: "3px 2px",
+    transition: "all 0.2s"
   });
 
   return (
@@ -65,7 +75,7 @@ const Complejos = () => {
       <h2 style={{ fontWeight: 700, marginBottom: "8px" }}>Todos los complejos</h2>
       <p className="text-muted mb-4">Descubre los mejores espacios deportivos.</p>
 
-      {/* Barra de búsqueda + botón filtros */}
+      {/* Barra de búsqueda */}
       <div className="d-flex gap-3 mb-3 align-items-center">
         <input
           type="text"
@@ -80,7 +90,7 @@ const Complejos = () => {
           style={{
             padding: "8px 20px", borderRadius: "20px", border: "0.5px solid #ccc",
             background: filtrosActivos.length > 0 ? "#3B6D11" : "transparent",
-            color: filtrosActivos.length > 0 ? "#EAF3DE" : "var(--color-text-primary)",
+            color: filtrosActivos.length > 0 ? "#EAF3DE" : "#333",
             cursor: "pointer", fontSize: "13px", fontWeight: 500,
             display: "flex", alignItems: "center", gap: "6px"
           }}
@@ -88,65 +98,56 @@ const Complejos = () => {
           ⚙ Filtros {filtrosActivos.length > 0 && `(${filtrosActivos.length})`}
         </button>
         {filtrosActivos.length > 0 && (
-          <button onClick={limpiarTodo} style={{ fontSize: "12px", color: "var(--color-text-secondary)", background: "none", border: "none", cursor: "pointer" }}>
+          <button onClick={limpiarTodo} className="btn btn-link btn-sm text-decoration-none text-muted">
             Limpiar filtros
           </button>
         )}
       </div>
 
       {/* Tags de filtros activos */}
-      {filtrosActivos.length > 0 && (
-        <div className="d-flex flex-wrap gap-2 mb-3">
-          {filtrosActivos.map((f, i) => (
-            <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "12px", padding: "3px 10px", borderRadius: "20px", background: "#EAF3DE", color: "#27500A", border: "0.5px solid #C0DD97" }}>
-              {f.label}
-              <span onClick={f.clear} style={{ cursor: "pointer", fontWeight: 500 }}>✕</span>
-            </span>
-          ))}
-        </div>
-      )}
+      <div className="d-flex flex-wrap gap-2 mb-3">
+        {filtrosActivos.map((f, i) => (
+          <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "12px", padding: "3px 10px", borderRadius: "20px", background: "#EAF3DE", color: "#27500A", border: "0.5px solid #C0DD97" }}>
+            {f.label}
+            <span onClick={f.clear} style={{ cursor: "pointer", fontWeight: 700 }}>✕</span>
+          </span>
+        ))}
+      </div>
 
-      {/* Contador */}
-      <p style={{ fontSize: "13px", color: "var(--color-text-secondary)", marginBottom: "16px" }}>
-        {complejosFiltrados.length} complejo(s) encontrado(s)
-      </p>
+      <p className="small text-muted mb-4">{complejosFiltrados.length} complejo(s) encontrado(s)</p>
 
-      {/* Grid */}
+      {/* Grid de Complejos */}
       <div className="row g-4">
         {complejosFiltrados.length === 0 ? (
           <div className="text-center py-5">
             <p style={{ fontSize: "32px" }}>🏟</p>
-            <p style={{ fontWeight: 500, marginBottom: "4px" }}>No hay complejos disponibles</p>
+            <p className="fw-bold mb-1">No hay complejos disponibles</p>
             <p className="text-muted small mb-3">Intenta ajustar o eliminar algunos filtros.</p>
-            <button onClick={limpiarTodo} style={{ padding: "6px 16px", borderRadius: "8px", border: "0.5px solid #ccc", background: "transparent", cursor: "pointer" }}>Limpiar filtros</button>
+            <button className="btn btn-outline-secondary btn-sm" onClick={limpiarTodo}>Limpiar filtros</button>
           </div>
         ) : (
           complejosFiltrados.map((complejo, idx) => (
-            <div className="col-4" key={complejo.id}>
+            <div className="col-12 col-md-6 col-lg-4" key={complejo.id}>
               <div className="card border-0 shadow-sm h-100"
-                style={{ cursor: "pointer", borderRadius: "12px", overflow: "hidden", transition: "transform 0.2s ease" }}
-                onClick={() => navigate(`/complejos/${complejo.id}?categoria=${complejo.categoria}`)}
-                onMouseEnter={e => e.currentTarget.style.transform = "translateY(-4px)"}
+                style={{ cursor: "pointer", borderRadius: "12px", overflow: "hidden", transition: "transform 0.2s" }}
+                onClick={() => navigate(`/complejos/${complejo.id}`)}
+                onMouseEnter={e => e.currentTarget.style.transform = "translateY(-5px)"}
                 onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}
               >
-                <img src={complejo.imagen_url || COMPLEJO_IMGS[idx % COMPLEJO_IMGS.length]}
-                  style={{ width: "100%", height: "200px", objectFit: "cover" }} alt={complejo.nombre} />
+                <img 
+                  src={complejo.imagen_url || COMPLEJO_IMGS[idx % COMPLEJO_IMGS.length]}
+                  style={{ width: "100%", height: "200px", objectFit: "cover" }} 
+                  alt={complejo.nombre} 
+                />
                 <div className="p-3">
-                  <h5 style={{ fontWeight: 700, marginBottom: "4px" }}>{complejo.nombre}</h5>
-                  <p className="text-muted small mb-1">📍 {complejo.city || "Ciudad no disponible"}{complejo.country ? `, ${complejo.country}` : ""}</p>
-                  {complejo.phone && <p className="text-muted small mb-1">📞 {complejo.phone}</p>}
-                  {complejo.google_map && (
-                    <a href={complejo.google_map} target="_blank" rel="noopener noreferrer"
-                      style={{ color: "#7cba00", fontWeight: 600, fontSize: "12px", textDecoration: "none" }}>
-                      🗺️ Google Maps
-                    </a>
-                  )}
-                  <div className="mt-2">
-                    <span style={{ background: "#f0fad0", color: "#3a7a00", fontSize: "12px", padding: "2px 10px", borderRadius: "20px" }}>
+                  <h5 className="fw-bold mb-1">{complejo.nombre}</h5>
+                  <p className="text-muted small mb-2">📍 {complejo.city}, {complejo.country}</p>
+                  <div className="mb-3">
+                    <span className="badge rounded-pill" style={{ background: "#f0fad0", color: "#3a7a00", fontWeight: 500 }}>
                       {complejo.categoria}
                     </span>
                   </div>
-                  <p style={{ color: "#7cba00", fontWeight: 600, fontSize: "13px", marginTop: "8px", marginBottom: 0 }}>Ver más detalles →</p>
+                  <p className="mb-0" style={{ color: "#7cba00", fontWeight: 600, fontSize: "14px" }}>Ver detalles →</p>
                 </div>
               </div>
             </div>
@@ -154,67 +155,61 @@ const Complejos = () => {
         )}
       </div>
 
-      {/* Panel de filtros lateral */}
+      {/* Sidebar de Filtros */}
       {mostrarFiltros && (
         <>
           <div onClick={() => setMostrarFiltros(false)}
-           style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", zIndex: 998 }} />
+            style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 1040 }} />
           <div style={{
             position: "fixed", top: 0, right: 0, height: "100vh", width: "320px",
-            background: "#ffffff", zIndex: 999,
-            padding: "1.5rem", overflowY: "auto",
-            boxShadow: "-4px 0 20px rgba(0,0,0,0.1)"
+            background: "#fff", zIndex: 1050, padding: "2rem", overflowY: "auto",
+            boxShadow: "-5px 0 15px rgba(0,0,0,0.1)"
           }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
-              <h5 style={{ fontWeight: 500, margin: 0 }}>Filtros</h5>
-              <button onClick={() => setMostrarFiltros(false)}
-                style={{ background: "none", border: "none", fontSize: "18px", cursor: "pointer", color: "var(--color-text-secondary)" }}>✕</button>
+            <div className="d-flex justify-content-between align-items-center mb-4">
+              <h5 className="mb-0 fw-bold">Filtros</h5>
+              <button className="btn-close" onClick={() => setMostrarFiltros(false)}></button>
             </div>
 
-            <p style={{ fontSize: "12px", fontWeight: 500, color: "var(--color-text-tertiary)", marginBottom: "8px" }}>CATEGORÍA</p>
-            <div style={{ marginBottom: "1.25rem" }}>
-              <button style={btnStyle(categoriaActiva === "Todas")} onClick={() => setCategoriaActiva("Todas")}>Todas</button>
-              {categorias.map((cat, i) => (
-                <button key={i} style={btnStyle(categoriaActiva === cat.nombre)} onClick={() => setCategoriaActiva(cat.nombre)}>
-                  {cat.nombre}
-                </button>
-              ))}
+            <div className="mb-4">
+              <label className="fw-bold small mb-2 d-block">CATEGORÍA</label>
+              <div className="d-flex flex-wrap">
+                {["Todas", ...categorias.map(cat => cat.nombre)].map(cat => (
+                  <button key={cat} onClick={() => setCategoriaActiva(cat)} style={btnStyle(categoriaActiva === cat)}>
+                    {cat}
+                  </button>
+                ))}
+              </div>
             </div>
 
-            <hr style={{ border: "none", borderTop: "0.5px solid var(--color-border-tertiary)", margin: "1rem 0" }} />
-
-            <p style={{ fontSize: "12px", fontWeight: 500, color: "var(--color-text-tertiary)", marginBottom: "8px" }}>CIUDAD</p>
-            <div style={{ marginBottom: "1.25rem" }}>
-              {ciudades.map((ciudad, i) => (
-                <button key={i} style={btnStyle(ciudadActiva === ciudad)} onClick={() => setCiudadActiva(ciudad)}>
-                  {ciudad}
-                </button>
-              ))}
+            <div className="mb-4">
+              <label className="fw-bold small mb-2 d-block">CIUDAD</label>
+              <div className="d-flex flex-wrap">
+                {ciudades.map(c => (
+                  <button key={c} onClick={() => setCiudadActiva(c)} style={btnStyle(ciudadActiva === c)}>
+                    {c}
+                  </button>
+                ))}
+              </div>
             </div>
 
-            <hr style={{ border: "none", borderTop: "0.5px solid var(--color-border-tertiary)", margin: "1rem 0" }} />
-
-            <p style={{ fontSize: "12px", fontWeight: 500, color: "var(--color-text-tertiary)", marginBottom: "8px" }}>PAÍS</p>
-            <div style={{ marginBottom: "1.25rem" }}>
-              {paises.map((pais, i) => (
-                <button key={i} style={btnStyle(paisActivo === pais)} onClick={() => setPaisActivo(pais)}>
-                  {pais}
-                </button>
-              ))}
+            <div className="mb-4">
+              <label className="fw-bold small mb-2 d-block">PAÍS</label>
+              <div className="d-flex flex-wrap">
+                {paises.map(p => (
+                  <button key={p} onClick={() => setPaisActivo(p)} style={btnStyle(paisActivo === p)}>
+                    {p}
+                  </button>
+                ))}
+              </div>
             </div>
 
-            <hr style={{ border: "none", borderTop: "0.5px solid var(--color-border-tertiary)", margin: "1rem 0" }} />
-
-            <div style={{ display: "flex", gap: "8px", marginTop: "1rem" }}>
-              <button onClick={limpiarTodo}
-                style={{ flex: 1, padding: "8px", borderRadius: "8px", border: "0.5px solid #ccc", background: "transparent", cursor: "pointer", fontSize: "13px" }}>
-                Limpiar todo
-              </button>
-              <button onClick={() => setMostrarFiltros(false)}
-                style={{ flex: 1, padding: "8px", borderRadius: "8px", border: "none", background: "#3B6D11", color: "#EAF3DE", cursor: "pointer", fontSize: "13px", fontWeight: 500 }}>
-                Ver resultados
-              </button>
-            </div>
+            <button 
+              className="btn btn-dark w-100 mt-3" 
+              onClick={() => setMostrarFiltros(false)}
+              style={{ borderRadius: "10px" }}
+            >
+              Aplicar Filtros
+            </button>
           </div>
         </>
       )}
