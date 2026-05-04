@@ -47,7 +47,7 @@ export const Navbar = () => {
 
 					<Link className="nav-link text-white" to="/">Inicio</Link>
 
-				
+
 
 					{!isAuthenticated && <Link className="nav-link text-white" to="/register">Registro</Link>}
 					{isAdmin && isAuthenticated && (
@@ -118,7 +118,7 @@ export const Navbar = () => {
 						style={{ background: "#C8F135", color: "#111", fontWeight: 600, padding: "8px 20px", borderRadius: "8px" }}
 						onClick={() => navigate("/reservas")}
 					>
-						RESERVAR AHORA 
+						RESERVAR AHORA
 					</button>
 
 					{!isAuthenticated && (
