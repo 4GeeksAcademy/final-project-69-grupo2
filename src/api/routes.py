@@ -4,7 +4,7 @@ This module takes care of starting the API Server, Loading the DB and Adding the
 from flask import Flask, request, jsonify, url_for, Blueprint
 from sqlalchemy.exc import IntegrityError
 from api.utils import generate_sitemap, APIException, validate_email, send_email
-from api.models import db, User, Categoria, Complejo, Cancha, Reserva
+from api.models import db, User, Categoria, Complejo, Cancha, Reserva, Role
 from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
 from base64 import b64encode
@@ -59,7 +59,12 @@ def create_user():
     username = data["username"].strip()
     full_name = data["full_name"].strip()
     password = data["password"].strip()
+    role_raw = data.get("role", "user")
+    role_value = str(role_raw).strip().lower()
     avatar_file = data.get("avatar_url")
+
+    if role_value not in {Role.USER.value, Role.ADMIN.value}:
+        return jsonify({"error": "Invalid role. Allowed roles: user, admin"}), 400
 
     try:
         avatar_url = _resolve_avatar_url(avatar_file)
@@ -92,6 +97,7 @@ def create_user():
             username=username,
             password=hashed_password,
             salt=salt,
+            role=Role(role_value),
             is_active=False,
             avatar_url=avatar_url,
             full_name=full_name)

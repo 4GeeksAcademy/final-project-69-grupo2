@@ -7,7 +7,8 @@ const initialStateUser = {
     username: "",
     full_name: "",
     password: "",
-    avatar: null
+    avatar: null,
+    role: "user"
 }
 
 export const Register = () => {
@@ -23,6 +24,13 @@ export const Register = () => {
         setUser((prev) => ({ ...prev, [name]: value }))
     }
 
+    const handleRoleChange = ({ target }) => {
+        setUser((prev) => ({
+            ...prev,
+            role: target.checked ? "admin" : "user"
+        }))
+    }
+
     const handleSubmit = (event) => {
         event.preventDefault()
         setError(null)
@@ -33,8 +41,10 @@ export const Register = () => {
         formData.append("email", user.email);
         formData.append("username", user.username);
         formData.append("full_name", user.full_name);
-        formData.append("password", user.password);
+        formData.append("password", user.password);        
         formData.append("avatar_url", user.avatar);
+        formData.append("role", user.role);
+        
 
         registerUser(formData)
             .then((response) => {
@@ -136,6 +146,22 @@ export const Register = () => {
                                     ref={avatarInputRef}
                                     onChange={(event) => setUser((prev) => ({ ...prev, avatar: event.target.files[0] }))}
                                 />
+                            </div>
+
+                            <div className="mb-3 form-check">
+                                <input
+                                    type="checkbox"
+                                    className="form-check-input"
+                                    id="register_as_complejo"
+                                    checked={user.role === "admin"}
+                                    onChange={handleRoleChange}
+                                />
+                                <label className="form-check-label" htmlFor="register_as_complejo">
+                                    Registrarme como Complejo
+                                </label>
+                                <div className="form-text">
+                                    Si no seleccionas esta opción, te registrarás como usuario general.
+                                </div>
                             </div>
 
                             <div className="d-grid">
