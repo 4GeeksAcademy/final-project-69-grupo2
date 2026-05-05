@@ -150,5 +150,7 @@ class Reserva(db.Model):
             "cancha_nombre": self.cancha.nombre if self.cancha else None,
             "complejo_nombre": self.cancha.complejo.nombre if self.cancha and self.cancha.complejo else None,
             "complejo_id": self.cancha.complejo_id if self.cancha else None,
+            "user": self.user.serialize() if self.user else None,
             "estado": self.estado
         }
+ 
