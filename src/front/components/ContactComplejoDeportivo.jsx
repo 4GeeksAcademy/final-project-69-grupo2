@@ -22,7 +22,7 @@ const ContactComplejoDeportivo = ({ complejo, onDelete }) => {
                 
                 {/* Información Central */}
                 <div className="col-md-6 px-3">
-                    {/* Cambiado: ahora usa .nombre para coincidir con tu base de datos */}
+                  
                     <h5 className="mb-1 text-primary fw-bold">{complejo.nombre}</h5>
                     
                     {/* Ubicación: Ciudad y País */}
@@ -58,7 +58,7 @@ const ContactComplejoDeportivo = ({ complejo, onDelete }) => {
                 <div className="col-md-4 d-flex justify-content-end align-items-center gap-2">
                     {/* Botón para ir a la gestión de canchas de este complejo */}
                     <Link to={`/complejo/${complejo.id}/add-cancha`} className="btn btn-outline-success btn-sm rounded-pill">
-                        <i className="fa fa-futbol me-1"></i> Cargar Canchas
+                        <i className="fa fa-futbol me-1"></i> Cargar y Ver Canchas Disponibles
                     </Link>
                     
                     {/* Botón para editar el complejo */}
