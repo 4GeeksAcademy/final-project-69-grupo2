@@ -55,7 +55,7 @@ const Canchas = () => {
                   </div>
                   <p className="card-text text-success fw-bold fs-5">${Number(c.precio_hora).toLocaleString("es-CO")} / hr</p>
                   
-                  {/* BOTÓN ACTUALIZADO CON LA RUTA DE RESERVA COMPLETA */}
+                
                   <button
                     className="btn w-100 shadow-sm"
                     style={{ background: "#C8F135", color: "#111", fontWeight: 600, borderRadius: 10 }}
