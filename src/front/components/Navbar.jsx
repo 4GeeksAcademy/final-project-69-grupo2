@@ -6,12 +6,15 @@ export const Navbar = () => {
 	const [categorias, setCategorias] = useState([]);
 	const navigate = useNavigate();
 	const { store, dispatch } = useGlobalReducer();
+
 	const isAuthenticated = Boolean(store?.auth?.isAuthenticated);
 	const user = store?.auth?.user;
 	const role = String(user?.role || "user").toLowerCase();
+
 	const isAdmin = role === "admin";
 	const isSuperAdmin = role === "super_admin";
 	const isGeneralUser = role === "user";
+
 	const avatarUrl = user?.avatar_url;
 	const avatarFallback = (user?.username?.[0] || user?.email?.[0] || "U").toUpperCase();
 
@@ -43,31 +46,23 @@ export const Navbar = () => {
 				</Link>
 
 				<div className="d-flex align-items-center gap-3 ms-auto">
-
-
 					<Link className="nav-link text-white" to="/">Inicio</Link>
 
-
-
-					{!isAuthenticated && <Link className="nav-link text-white" to="/register">Registro</Link>}
-					{isAdmin && isAuthenticated && (
-						<Link className="nav-link text-white" to="/add-complejo">
-							<i className="fa fa-plus me-1"></i> Añadir Complejo
-						</Link>
+					{!isAuthenticated && (
+						<Link className="nav-link text-white" to="/register">Registro</Link>
 					)}
+
+					{/* Dropdown Categorías */}
 					<div className="dropdown">
-						<button
-							className="btn nav-link text-white dropdown-toggle"
-							data-bs-toggle="dropdown"
-						>
+						<button className="btn nav-link text-white dropdown-toggle" data-bs-toggle="dropdown">
 							Categorías
 						</button>
 						<ul className="dropdown-menu dropdown-menu-end">
 							{categorias.length === 0 ? (
 								<li><span className="dropdown-item text-muted">Cargando...</span></li>
 							) : (
-								categorias.map((cat, i) => (
-									<li key={i}>
+								categorias.map((cat) => (
+									<li key={cat.id || cat.nombre}>
 										<button
 											className="dropdown-item"
 											onClick={() => navigate(`/?categoria=${cat.nombre}`)}
@@ -80,36 +75,35 @@ export const Navbar = () => {
 						</ul>
 					</div>
 
+					{/* Dropdown Opciones de Usuario (Solo si está autenticado) */}
 					{isAuthenticated && (
-						<div class="dropdown me-1">
-							<button type="button" class="btn btn-secondary dropdown-toggle" id="dropdownMenuOffset" data-bs-toggle="dropdown" aria-expanded="false" data-bs-offset="10,20">
-								Opciones de Usuario
+						<div className="dropdown">
+							<button className="btn btn-secondary dropdown-toggle" data-bs-toggle="dropdown">
+								Mi Panel
 							</button>
-
-							{isSuperAdmin && (
-								<ul class="dropdown-menu" aria-labelledby="dropdownMenuOffset">
-									<li><a class="dropdown-item" href="#">Gestionar Complejos</a></li>
-									<li><a class="dropdown-item" href="#">Reporte de Reservas</a></li>
-									<li><a class="dropdown-item" href="#">Confirmación de Reservas</a></li>
-									<li><a class="dropdown-item" href="#">Gestionar Usuarios</a></li>
-								</ul>
-							)}
-
-							{isAdmin && (
-								<ul class="dropdown-menu" aria-labelledby="dropdownMenuOffset">
-									<li><a class="dropdown-item" href="#">Gestionar Complejos</a></li>
-									<li><a class="dropdown-item" href="#">Reporte de Reservas</a></li>
-									<li><a class="dropdown-item" href="#">Confirmación de Reservas</a></li>
-								</ul>
-							)}
-
-							{isGeneralUser && (
-								<ul class="dropdown-menu" aria-labelledby="dropdownMenuOffset">
-									<li><a class="dropdown-item" href="#">Mis Reservas</a></li>
-									<li><a class="dropdown-item" href="#">Registro de Complejo</a></li>
-								</ul>
-							)}
-
+							<ul className="dropdown-menu dropdown-menu-end">
+								{isSuperAdmin && (
+									<>
+										<li><Link className="dropdown-item" to="/admin/complejos">Gestionar Complejos</Link></li>
+										<li><Link className="dropdown-item" to="/admin/reservas">Reporte de Reservas</Link></li>
+										<li><Link className="dropdown-item" to="/admin/confirmaciones">Confirmación de Reservas</Link></li>
+										<li><Link className="dropdown-item" to="/admin/usuarios">Gestionar Usuarios</Link></li>
+									</>
+								)}
+								{isAdmin && (
+									<>
+										<li><Link className="dropdown-item" to="/mis-complejos">Gestionar Complejos</Link></li>
+										<li><Link className="dropdown-item" to="/reportes">Reporte de Reservas</Link></li>
+										<li><Link className="dropdown-item" to="/confirmar">Confirmación de Reservas</Link></li>
+									</>
+								)}
+								{isGeneralUser && (
+									<>
+										<li><Link className="dropdown-item" to="/mis-reservas">Mis Reservas</Link></li>
+										<li><Link className="dropdown-item" to="/add-complejo">Registro de Complejo</Link></li>
+									</>
+								)}
+							</ul>
 						</div>
 					)}
 
@@ -121,7 +115,7 @@ export const Navbar = () => {
 						RESERVAR AHORA
 					</button>
 
-					{!isAuthenticated && (
+					{!isAuthenticated ? (
 						<button
 							className="btn btn-outline-light"
 							style={{ fontWeight: 600, padding: "8px 20px", borderRadius: "8px" }}
@@ -129,39 +123,24 @@ export const Navbar = () => {
 						>
 							LOGIN
 						</button>
-					)}
-
-					{isAuthenticated && (
-						<div className="d-flex align-items-center gap-2">
+					) : (
+						<div className="d-flex align-items-center gap-2 ms-2">
 							<div
-								className="d-flex align-items-center justify-content-center text-uppercase"
+								className="d-flex align-items-center justify-content-center"
 								style={{
-									width: "34px",
-									height: "34px",
-									borderRadius: "50%",
-									overflow: "hidden",
-									border: "2px solid #C8F135",
-									background: "#14263b",
-									color: "#fff",
-									fontWeight: 700,
-									fontSize: "12px"
+									width: "34px", height: "34px", borderRadius: "50%",
+									overflow: "hidden", border: "2px solid #C8F135",
+									background: "#14263b", color: "#fff", fontWeight: 700, fontSize: "12px"
 								}}
-								title={user?.username || user?.email || "Usuario"}
+								title={user?.username || user?.email}
 							>
 								{avatarUrl ? (
-									<img
-										src={avatarUrl}
-										alt="Avatar"
-										style={{ width: "100%", height: "100%", objectFit: "cover" }}
-									/>
+									<img src={avatarUrl} alt="Avatar" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
 								) : (
 									<span>{avatarFallback}</span>
 								)}
 							</div>
-							<button
-								className="btn btn-auth-shared"
-								onClick={handleLogout}
-							>
+							<button className="btn btn-sm btn-outline-danger" onClick={handleLogout}>
 								Log Out
 							</button>
 						</div>
