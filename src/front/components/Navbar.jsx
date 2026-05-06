@@ -84,7 +84,7 @@ export const Navbar = () => {
 							<ul className="dropdown-menu dropdown-menu-end">
 								{isSuperAdmin && (
 									<>
-										<li><Link className="dropdown-item" to="/admin/complejos">Gestionar Complejos</Link></li>
+										<li><Link className="dropdown-item" to="/add-complejo">Gestionar Complejos</Link></li>
 										<li><Link className="dropdown-item" to="/admin/reservas">Reporte de Reservas</Link></li>
 										<li><Link className="dropdown-item" to="/admin/confirmaciones">Confirmación de Reservas</Link></li>
 										<li><Link className="dropdown-item" to="/admin/usuarios">Gestionar Usuarios</Link></li>
@@ -92,7 +92,7 @@ export const Navbar = () => {
 								)}
 								{isAdmin && (
 									<>
-										<li><Link className="dropdown-item" to="/mis-complejos">Gestionar Complejos</Link></li>
+										<li><Link className="dropdown-item" to="/add-complejo">Gestionar Complejos</Link></li>
 										<li><Link className="dropdown-item" to="/reportes">Reporte de Reservas</Link></li>
 										<li><Link className="dropdown-item" to="/confirmar">Confirmación de Reservas</Link></li>
 									</>
@@ -100,7 +100,6 @@ export const Navbar = () => {
 								{isGeneralUser && (
 									<>
 										<li><Link className="dropdown-item" to="/mis-reservas">Mis Reservas</Link></li>
-										<li><Link className="dropdown-item" to="/add-complejo">Registro de Complejo</Link></li>
 									</>
 								)}
 							</ul>

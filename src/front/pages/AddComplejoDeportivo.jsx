@@ -10,23 +10,26 @@ export const AddComplejoDeportivo = () => {
     const [complejos, setComplejos] = useState([]);
     const [verFormulario, setVerFormulario] = useState(id ? true : false);
 
-   
+
     const [complejo, setComplejo] = useState({
-        name: "", 
-        email: "", 
-        phone: "", 
-        address: "", 
-        country: "", 
-        city: "", 
-        google_map: "", 
-        image: null 
+        name: "",
+        email: "",
+        phone: "",
+        address: "",
+        country: "",
+        city: "",
+        google_map: "",
+        image: null
     });
 
     const backendUrl = import.meta.env.VITE_BACKEND_URL.replace(/\/$/, "");
 
     const cargarDatos = async () => {
         try {
-            const resp = await fetch(`${backendUrl}/api/complejos`);
+            const token = localStorage.getItem("access_token");
+            const resp = await fetch(`${backendUrl}/api/mis-complejos`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
             if (resp.ok) setComplejos(await resp.json());
         } catch (error) { console.error("Error lista:", error); }
 
@@ -43,7 +46,7 @@ export const AddComplejoDeportivo = () => {
                         country: data.country || "",
                         city: data.city || "",
                         google_map: data.google_map || "",
-                        image: null 
+                        image: null
                     });
                     setVerFormulario(true);
                 }
@@ -67,16 +70,18 @@ export const AddComplejoDeportivo = () => {
         formData.append("country", complejo.country);
         formData.append("city", complejo.city);
         formData.append("google_map", complejo.google_map);
-        
+
         // Solo añadimos la imagen si el usuario seleccionó una nueva
         if (complejo.image && complejo.image[0]) {
             formData.append("image", complejo.image[0]);
         }
 
         try {
+            const token = localStorage.getItem("access_token");
             const response = await fetch(url, {
                 method: method,
-                body: formData, 
+                headers: { Authorization: `Bearer ${token}` },
+                body: formData,
             });
 
             if (response.ok) {
@@ -133,7 +138,7 @@ export const AddComplejoDeportivo = () => {
                             <label className="form-label fw-bold">Email de Contacto</label>
                             <input type="email" className="form-control" value={complejo.email} onChange={e => setComplejo({ ...complejo, email: e.target.value })} required />
                         </div>
-                        
+
                         {/* CAMPOS DE CIUDAD Y PAÍS */}
                         <div className="col-md-6">
                             <label className="form-label fw-bold">País</label>
@@ -160,11 +165,11 @@ export const AddComplejoDeportivo = () => {
                         {/* CAMPO PARA SUBIR FOTO */}
                         <div className="col-md-12 mt-3">
                             <label className="form-label fw-bold text-success">Foto o Logo del Complejo</label>
-                            <input 
-                                type="file" 
-                                className="form-control" 
+                            <input
+                                type="file"
+                                className="form-control"
                                 accept="image/*"
-                                onChange={e => setComplejo({ ...complejo, image: e.target.files })} 
+                                onChange={e => setComplejo({ ...complejo, image: e.target.files })}
                             />
                             <div className="form-text">Formatos aceptados: JPG, PNG, WEBP.</div>
                         </div>
