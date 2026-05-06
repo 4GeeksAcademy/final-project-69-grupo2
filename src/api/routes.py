@@ -327,6 +327,14 @@ def get_complejos():
     return jsonify([c.serialize() for c in complejos]), 200
 
 
+@api.route('/mis-complejos', methods=['GET'])
+@jwt_required()
+def get_mis_complejos():
+    current_user_id = get_jwt_identity()
+    complejos = Complejo.query.filter_by(owner_id=int(current_user_id)).all()
+    return jsonify([c.serialize() for c in complejos]), 200
+
+
 @api.route('/complejo/<int:id>', methods=['GET'])
 def get_complejo(id):
     complejo = Complejo.query.get(id)
@@ -336,7 +344,9 @@ def get_complejo(id):
 
 
 @api.route('/complejo', methods=['POST'])
+@jwt_required()
 def add_complejo():
+    current_user_id = get_jwt_identity()
     # Recibimos del FormData (Frontend usa 'name')
     nombre = request.form.get("name")
     email = request.form.get("email")
@@ -366,7 +376,8 @@ def add_complejo():
             country=country,
             city=city,
             google_map=google_map,
-            imagen_url=url_cloudinary  # Usamos 'imagen_url' como dice tu clase
+            imagen_url=url_cloudinary,  # Usamos 'imagen_url' como dice tu clase
+            owner_id=int(current_user_id)
         )
         db.session.add(nuevo_complejo)
         db.session.commit()
@@ -377,10 +388,15 @@ def add_complejo():
 
 
 @api.route('/complejo/<int:id>', methods=['PUT'])
+@jwt_required()
 def update_complejo(id):
+    current_user_id = get_jwt_identity()
     complejo = Complejo.query.get(id)
     if not complejo:
         return jsonify({"error": "Complejo no encontrado"}), 404
+
+    if complejo.owner_id != int(current_user_id) and User.query.get(current_user_id).role != Role.ADMIN:
+        return jsonify({"error": "No tienes permiso para modificar este complejo"}), 403
 
     # IMPORTANTE: Usar los nombres exactos de tu modelo (nombre, country, city, etc.)
     complejo.nombre = request.form.get("name", complejo.nombre)
@@ -410,10 +426,14 @@ def update_complejo(id):
 
 
 @api.route('/complejo/<int:id>', methods=['DELETE'])
+@jwt_required()
 def delete_complejo(id):
+    current_user_id = get_jwt_identity()
     complejo = Complejo.query.get(id)
     if not complejo:
         return jsonify({"msg": "No existe"}), 404
+    if complejo.owner_id != int(current_user_id) and User.query.get(current_user_id).role != Role.ADMIN:
+        return jsonify({"error": "No tienes permiso para eliminar este complejo"}), 403
     db.session.delete(complejo)
     db.session.commit()
     return jsonify({"msg": "Eliminado"}), 200
