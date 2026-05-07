@@ -96,12 +96,14 @@ const Reservas = () => {
   const navigate = useNavigate();
   const [canchas, setCanchas] = useState([]);
   const [canchaSeleccionada, setCanchaSeleccionada] = useState(null);
+  const [loading, setLoading] = useState(false);
   const backendUrl = import.meta.env.VITE_BACKEND_URL.replace(/\/$/, "");
 
   // 1. Cargar todas las canchas del sistema
   useEffect(() => {
     const cargarCanchas = async () => {
       try {
+        setLoading(true);
         const resp = await fetch(`${backendUrl}/api/canchas`);
         if (resp.ok) {
           const data = await resp.json();
@@ -109,6 +111,8 @@ const Reservas = () => {
         }
       } catch (error) {
         console.error("Error al cargar canchas:", error);
+      } finally {
+        setLoading(false);
       }
     };
     cargarCanchas();
@@ -156,10 +160,20 @@ const Reservas = () => {
                 </div>
               ))
             ) : (
-              <div className="text-center p-5 w-100">
-                <div className="spinner-border text-success mb-3"></div>
-                <p>Buscando canchas disponibles...</p>
-              </div>
+              // <div className="text-center p-5 w-100">
+              //   <div className="spinner-border text-success mb-3"></div>
+              //   <p>Buscando canchas disponibles...</p>
+              // </div>
+              loading ? (
+                <div className="text-center p-5 w-100">
+                  <div className="spinner-border text-success mb-3"></div>
+                  <p>Buscando canchas disponibles...</p>
+                </div>
+              ) : (
+                <div className="text-center p-5 w-100">
+                  <p>No hay canchas disponibles en este momento.</p>
+                </div>
+              )
             )}
           </div>
         </>
