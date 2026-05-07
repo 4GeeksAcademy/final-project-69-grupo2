@@ -185,6 +185,32 @@ def profile():
                     "user": user.serialize()}), 200
 
 
+@api.route('/users/<int:user_id>/reservas', methods=['GET'])
+@jwt_required()
+def get_user_reservas(user_id):
+    """
+    Obtiene el historial de reservas de un usuario.
+    Solo el usuario mismo o un administrador puede acceder a sus reservas.
+    """
+    current_user_id = get_jwt_identity()
+    current_user = User.query.get(int(current_user_id))
+
+    # Verificar que el usuario exista
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"error": "Usuario no encontrado"}), 404
+
+    # Verificar permisos: solo el usuario o un admin pueden ver sus reservas
+    if current_user.id != user_id and current_user.role != Role.ADMIN and current_user.role != Role.SUPER_ADMIN:
+        return jsonify({"error": "No tiene permisos para ver estas reservas"}), 403
+
+    # Obtener todas las reservas del usuario ordenadas por fecha descendente
+    reservas = Reserva.query.filter_by(
+        user_id=user_id, es_bloqueo=False).order_by(Reserva.fecha.desc()).all()
+
+    return jsonify([res.serialize() for res in reservas]), 200
+
+
 @api.route('/example-email', methods=['GET'])
 def example_email():
     to = "bensirave@hotmail.com"
@@ -624,4 +650,227 @@ def delete_reserva(id):
         return jsonify({"msg": "Horario liberado correctamente"}), 200
     except Exception as e:
         db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+
+@api.route('/admin/reportes', methods=['GET'])
+@jwt_required()
+def get_admin_reports():
+    """
+    Obtiene un reporte de reservas para el admin.
+        Solo admins pueden acceder a este endpoint.
+        El admin solo ve reservas de sus propios complejos.
+
+        Query parameters:
+        - complejo_id (int): Filtrar por ID de complejo
+        - cancha_id (int): Filtrar por ID de cancha
+        - fecha (str): Filtrar por fecha (YYYY-MM-DD)
+        - fecha_inicio (str): Fecha inicio rango (YYYY-MM-DD)
+        - fecha_fin (str): Fecha fin rango (YYYY-MM-DD)
+        - estado (str): Filtrar por estado (pendiente, confirmada, cancelada)
+    """
+    try:
+        current_user_id = get_jwt_identity()
+        current_user = User.query.get(int(current_user_id))
+
+        if not current_user:
+            return jsonify({"error": "Usuario no encontrado"}), 404
+
+        # Verificar que sea admin o super_admin
+        if current_user.role not in [Role.ADMIN, Role.SUPER_ADMIN]:
+            return jsonify({"error": "Acceso denegado. Solo administradores pueden ver reportes"}), 403
+
+        # Obtener parámetros de filtro
+        complejo_id = request.args.get("complejo_id", type=int)
+        cancha_id = request.args.get("cancha_id", type=int)
+        fecha = request.args.get("fecha", type=str)
+        fecha_inicio = request.args.get("fecha_inicio", type=str)
+        fecha_fin = request.args.get("fecha_fin", type=str)
+        estado = request.args.get("estado", type=str)
+
+        # Obtener los complejos del admin
+        admin_complejos = Complejo.query.filter_by(
+            owner_id=current_user.id).all()
+        admin_complejo_ids = [c.id for c in admin_complejos]
+
+        if not admin_complejo_ids:
+            return jsonify([]), 200  # Sin complejos, sin reservas
+
+        # Construir query base
+        query = db.session.query(Reserva).join(Cancha).filter(
+            Cancha.complejo_id.in_(admin_complejo_ids),
+            Reserva.es_bloqueo == False  # Excluir bloqueos
+        )
+
+        # Aplicar filtros
+        if complejo_id:
+            # Verificar que el complejo pertenezca al admin
+            if complejo_id not in admin_complejo_ids:
+                return jsonify({"error": "No tienes acceso a este complejo"}), 403
+            query = query.filter(Cancha.complejo_id == complejo_id)
+
+        if cancha_id:
+            # Verificar que la cancha pertenezca a uno de sus complejos
+            cancha = Cancha.query.get(cancha_id)
+            if not cancha or cancha.complejo_id not in admin_complejo_ids:
+                return jsonify({"error": "No tienes acceso a esta cancha"}), 403
+            query = query.filter(Reserva.cancha_id == cancha_id)
+
+        if fecha:
+            query = query.filter(Reserva.fecha == fecha)
+
+        if fecha_inicio and fecha_fin:
+            query = query.filter(
+                Reserva.fecha >= fecha_inicio,
+                Reserva.fecha <= fecha_fin
+            )
+        elif fecha_inicio:
+            query = query.filter(Reserva.fecha >= fecha_inicio)
+        elif fecha_fin:
+            query = query.filter(Reserva.fecha <= fecha_fin)
+
+        if estado:
+            query = query.filter(Reserva.estado == estado)
+
+        # Ejecutar query y ordenar por fecha descendente
+        reservas = query.order_by(
+            Reserva.fecha.desc(), Reserva.hora.desc()).all()
+
+        return jsonify([res.serialize() for res in reservas]), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@api.route('/admin/reportes/estadisticas', methods=['GET'])
+@jwt_required()
+def get_admin_statistics():
+    """
+    Obtiene estadísticas de reservas para el admin.
+    Solo admins pueden acceder a este endpoint.
+    """
+    try:
+        current_user_id = get_jwt_identity()
+        current_user = User.query.get(int(current_user_id))
+
+        if not current_user:
+            return jsonify({"error": "Usuario no encontrado"}), 404
+
+        # Verificar que sea admin o super_admin
+        if current_user.role not in [Role.ADMIN, Role.SUPER_ADMIN]:
+            return jsonify({"error": "Acceso denegado. Solo administradores"}), 403
+
+        # Obtener parámetros
+        fecha_inicio = request.args.get("fecha_inicio", type=str)
+        fecha_fin = request.args.get("fecha_fin", type=str)
+
+        # Obtener los complejos del admin
+        admin_complejos = Complejo.query.filter_by(
+            owner_id=current_user.id).all()
+        admin_complejo_ids = [c.id for c in admin_complejos]
+
+        if not admin_complejo_ids:
+            return jsonify({
+                "total_reservas": 0,
+                "confirmadas": 0,
+                "pendientes": 0,
+                "canceladas": 0,
+                "por_complejo": [],
+                "por_cancha": [],
+                "por_dia": []
+            }), 200
+
+        # Query base
+        query = db.session.query(Reserva).join(Cancha).filter(
+            Cancha.complejo_id.in_(admin_complejo_ids),
+            Reserva.es_bloqueo == False
+        )
+
+        # Aplicar rango de fechas
+        if fecha_inicio and fecha_fin:
+            query = query.filter(
+                Reserva.fecha >= fecha_inicio,
+                Reserva.fecha <= fecha_fin
+            )
+        elif fecha_inicio:
+            query = query.filter(Reserva.fecha >= fecha_inicio)
+        elif fecha_fin:
+            query = query.filter(Reserva.fecha <= fecha_fin)
+
+        reservas = query.all()
+
+        # Calcular estadísticas
+        total = len(reservas)
+        confirmadas = sum(1 for r in reservas if r.estado == "confirmada")
+        pendientes = sum(1 for r in reservas if r.estado == "pendiente")
+        canceladas = sum(1 for r in reservas if r.estado == "cancelada")
+
+        # Por complejo
+        por_complejo = {}
+        for r in reservas:
+            complejo_nombre = r.cancha.complejo.nombre if r.cancha and r.cancha.complejo else "Sin complejo"
+            if complejo_nombre not in por_complejo:
+                por_complejo[complejo_nombre] = {
+                    "total": 0, "confirmadas": 0}
+            por_complejo[complejo_nombre]["total"] += 1
+            if r.estado == "confirmada":
+                por_complejo[complejo_nombre]["confirmadas"] += 1
+
+        # Por cancha
+        por_cancha = {}
+        for r in reservas:
+            cancha_nombre = r.cancha.nombre if r.cancha else "Sin cancha"
+            if cancha_nombre not in por_cancha:
+                por_cancha[cancha_nombre] = {"total": 0, "confirmadas": 0}
+                por_cancha[cancha_nombre]["total"] += 1
+            if r.estado == "confirmada":
+                por_cancha[cancha_nombre]["confirmadas"] += 1
+
+        # Por día
+        por_dia = {}
+        for r in reservas:
+            fecha = r.fecha
+            if fecha not in por_dia:
+                por_dia[fecha] = {"total": 0, "confirmadas": 0}
+                por_dia[fecha]["total"] += 1
+            if r.estado == "confirmada":
+                por_dia[fecha]["confirmadas"] += 1
+
+        return jsonify({
+            "total_reservas": total,
+            "confirmadas": confirmadas,
+            "pendientes": pendientes,
+            "canceladas": canceladas,
+            "por_complejo": por_complejo,
+            "por_cancha": por_cancha,
+            "por_dia": por_dia
+        }), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@api.route('/admin/complejos', methods=['GET'])
+@jwt_required()
+def get_admin_complejos():
+    """
+    Obtiene los complejos que pertenecen al admin autenticado.
+    """
+    try:
+        current_user_id = get_jwt_identity()
+        current_user = User.query.get(int(current_user_id))
+
+        if not current_user:
+            return jsonify({"error": "Usuario no encontrado"}), 404
+
+        # Verificar que sea admin o super_admin
+        if current_user.role not in [Role.ADMIN, Role.SUPER_ADMIN]:
+            return jsonify({"error": "Acceso denegado"}), 403
+
+        complejos = Complejo.query.filter_by(
+            owner_id=current_user.id).all()
+
+        return jsonify([c.serialize() for c in complejos]), 200
+
+    except Exception as e:
         return jsonify({"error": str(e)}), 500

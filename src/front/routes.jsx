@@ -20,6 +20,8 @@ import { RecoveryPassword } from "./pages/RecoveryPassword";
 import { ActivateAccount } from "./pages/ActivationAccount";
 import { GestionHorarios } from "./pages/GestionHorarios.jsx";
 import { UserReservas } from "./pages/UserReservas.jsx";
+import MisReservas from "./pages/MisReservas.jsx";
+import Reportes from "./pages/Reportes.jsx";
 export const router = createBrowserRouter(
       createRoutesFromElements(
             <Route path="/" element={<Layout />}>
@@ -33,6 +35,8 @@ export const router = createBrowserRouter(
                   <Route path="/single/:theId" element={<Single />} />
                   <Route path="/demo" element={<Demo />} />
                   <Route path="/reservas" element={<Reservas />} />
+                  <Route path="/mis-reservas" element={<MisReservas />} />
+                  <Route path="/reportes" element={<Reportes />} />
                   <Route path="/todos-complejos" element={<Complejos />} />
                   <Route path="/register" element={<Register />} />
                   <Route path="/login" element={<Login />} />
