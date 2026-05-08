@@ -1,12 +1,14 @@
 
 import React, { useState, useEffect } from "react";
-import { useParams, useSearchParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import useGlobalReducer from "../hooks/useGlobalReducer.jsx";
 import Swal from "sweetalert2";
+import { loadStripe } from '@stripe/stripe-js';
+
+const stripePromise = loadStripe("pk_test_51TUDRHISwJbsFlBkBdqrlqrzzAOwNPMlrGMPl9Xxbf87OXt7sUU110JO25N0st4EXkRy4DY5iDPhHcMX8jEYcTiq00Y64lUMrW");
 
 const ReservaCancha = ({ canchaDesdePadre = null }) => {
     const { canchaId } = useParams();
-    const [searchParams] = useSearchParams();
     const navigate = useNavigate();
     const { store } = useGlobalReducer();
 
@@ -16,12 +18,11 @@ const ReservaCancha = ({ canchaDesdePadre = null }) => {
     const [reservas, setReservas] = useState([]);
     const [fecha, setFecha] = useState(new Date().toISOString().split("T")[0]);
     const [horaSeleccionada, setHoraSeleccionada] = useState("");
-    const [cargando, setCargando] = useState(false);
     const [paso, setPaso] = useState(1);
+    const [pagarTotal, setPagarTotal] = useState(false); // ✅ Estado para el checkbox
 
     const backendUrl = import.meta.env.VITE_BACKEND_URL.replace(/\/$/, "");
 
-    // Lógica para detectar el estado de la hora seleccionada
     const reservaEnHora = reservas.find(r => r.fecha === fecha && r.hora === horaSeleccionada);
     const estaOcupada = !!reservaEnHora;
     const estaCerrada = reservaEnHora?.es_bloqueo;
@@ -46,12 +47,10 @@ const ReservaCancha = ({ canchaDesdePadre = null }) => {
 
     const cargarReservas = async () => {
         if (!idFinal) return;
-        setCargando(true);
         try {
             const res = await fetch(`${backendUrl}/api/reservas/${idFinal}`);
             if (res.ok) setReservas(await res.json());
         } catch (e) { console.error(e); }
-        finally { setCargando(false); }
     };
 
     useEffect(() => { cargarReservas(); }, [idFinal, fecha]);
@@ -69,197 +68,293 @@ const ReservaCancha = ({ canchaDesdePadre = null }) => {
         if (!store.auth.isAuthenticated) {
             return Swal.fire({ icon: 'warning', title: 'Atención', text: 'Inicia sesión para reservar.', confirmButtonColor: '#0d1b2a' });
         }
-        if (!horaSeleccionada || estaOcupada) {
-            return Swal.fire({ icon: 'error', title: 'Error', text: 'Horario no disponible.', confirmButtonColor: '#0d1b2a' });
-        }
+
+        const montoTotal = Number(cancha?.precio_hora || 0);
+        const montoAPagar = pagarTotal ? montoTotal : montoTotal * 0.10;
 
         const result = await Swal.fire({
-            title: '¿Confirmar reserva?',
-            text: `¿Deseas reservar para las ${horaSeleccionada}hs?`,
+            title: pagarTotal ? '¿Confirmar Pago Total?' : '¿Confirmar y Pagar Seña?',
+            html: `
+        <div class="container-fluid text-center">
+            <!-- Alerta de Verificación -->
+            <div class="alert alert-warning border-0 py-2 small mb-3">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                <b>¡Atención! Verifique el resumen antes de continuar.</b>
+            </div>
+
+            <!-- Aviso de Cancelación -->
+            <div class="bg-light p-3 rounded border border-danger-subtle mb-3">
+                <p class="text-danger small mb-0" style="line-height: 1.4;">
+                    
+                    <b> Pago online.</b><br>
+                    Su reserva queda pendiente en caso de fallar el pago. En ese caso,
+                    Deberá solicitar cambios al correo o teléfono indicados en el resumen del turno, caso contrario se cancelará automáticamente.
+                </p>
+            </div>
+
+            <!-- Detalle de la Reserva -->
+            <div class="mb-2">
+                <p class="text-muted mb-1">Vas a reservar para las <b>${horaSeleccionada}hs</b></p>
+                <h3 class="${pagarTotal ? 'text-success' : 'text-primary'} fw-bold mb-0">
+                    Pagas ahora: $${montoAPagar.toLocaleString("es-CO")}
+                </h3>
+            </div>
+
+            <!-- Saldo Pendiente o Confirmación -->
+            ${!pagarTotal ? `
+                <div class="badge bg-secondary-subtle text-dark border mt-2">
+                    Saldo pendiente en cancha: $${(montoTotal * 0.9).toLocaleString("es-CO")}
+                </div>
+            ` : `
+                <div class="badge bg-success-subtle text-success border mt-2">
+                    <i class="fas fa-check-circle me-1"></i>Pago Total Completo
+                </div>
+            `}
+        </div>
+    `,
             icon: 'question',
             showCancelButton: true,
-            confirmButtonColor: '#C8F135',
-            cancelButtonColor: '#d33',
-            confirmButtonText: 'Sí, reservar',
-            cancelButtonText: 'Cancelar',
+            confirmButtonColor: pagarTotal ? '#198754' : '#0d1b2a', // Verde si es total, oscuro si es seña
+            confirmButtonText: '<i class="fas fa-credit-card me-2"></i>Ir a pagar',
+            cancelButtonText: 'Volver',
             color: '#111'
         });
 
         if (result.isConfirmed) {
             try {
-                const resp = await fetch(`${backendUrl}/api/reserva`, {
+                // 1. Crear la reserva
+                const respReserva = await fetch(`${backendUrl}/api/reserva`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
-                        fecha, hora: horaSeleccionada, cancha_id: idFinal,
-                        user_id: store.auth.user.id, es_bloqueo: false
+                        fecha,
+                        hora: horaSeleccionada,
+                        cancha_id: idFinal,
+                        user_id: store.auth.user.id,
+                        es_bloqueo: false
                     })
                 });
-                if (resp.ok) {
-                    Swal.fire({ icon: 'success', title: '¡Reserva exitosa!', showConfirmButton: false, timer: 1500 });
-                    cargarReservas();
-                    setHoraSeleccionada("");
-                    setPaso(1);
-                }
-            } catch (e) { console.error(e); }
-        }
-    };
 
-    const cancelarReserva = async (reservaId) => {
-        const result = await Swal.fire({
-            title: '¿Cancelar reserva?',
-            text: "Esta acción no se puede deshacer.",
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: '#d33',
-            cancelButtonColor: '#0d1b2a',
-            confirmButtonText: 'Sí, cancelar'
-        });
+                if (!respReserva.ok) throw new Error("No se pudo crear la reserva.");
 
-        if (result.isConfirmed) {
-            try {
-                const res = await fetch(`${backendUrl}/api/reserva/${reservaId}`, { method: "DELETE" });
-                if (res.ok) {
-                    Swal.fire('Cancelada', 'Tu reserva ha sido eliminada.', 'success');
-                    cargarReservas();
-                    setHoraSeleccionada("");
-                }
-            } catch (e) { console.error(e); }
+                // ✅ CAMBIO 1: Obtener el objeto de la reserva creada (que trae el ID real)
+                const nuevaReserva = await respReserva.json();
+
+                // 2. Crear la sesión de Stripe
+                const respStripe = await fetch(`${backendUrl}/api/create-checkout-session`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        precio: montoAPagar,
+                        nombre: `${pagarTotal ? 'Pago Total' : 'Seña'} - ${cancha?.nombre}`,
+                        // ✅ CAMBIO 2: Usar el ID de la reserva, NO el idFinal de la cancha
+                        reserva_id: nuevaReserva.id,
+                        success_url: `${window.location.origin}/pago-exitoso`,
+                        cancel_url: window.location.href
+                    })
+                });
+
+                const data = await respStripe.json();
+                if (data.url) window.location.href = data.url;
+            } catch (e) {
+                console.error(e);
+                Swal.fire('Error', 'Hubo un fallo al procesar la reserva.', 'error');
+            }
         }
+
     };
 
     return (
         <div className="card shadow-sm border-0 p-4 bg-white" style={{ borderRadius: 16 }}>
-            {/* Cabecera */}
-            <div className="mb-4">
-                <h5 className="text-muted small mb-1">
-                    <i className="fa fa-building me-2"></i>{complejo?.name || cancha?.complejo_nombre || "Complejo"}
-                </h5>
-                <h3 className="fw-bold mb-0">{cancha?.nombre || "Cancha"}</h3>
-                <span className="badge bg-light text-dark border mt-2">{cancha?.categoria_nombre || "Categoría"}</span>
-            </div>
-
-            {/* Pasos Visuales */}
-            <div className="d-flex align-items-center gap-3 mb-4">
-                {["Fecha", "Horario", "Confirmar"].map((label, i) => (
-                    <div key={i} className="d-flex align-items-center gap-2">
-                        <div style={{
-                            width: 28, height: 28, borderRadius: "50%", display: "flex",
-                            alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: "bold",
-                            background: paso === i + 1 ? "#0d1b2a" : paso > i + 1 ? "#C8F135" : "#eee",
-                            color: paso === i + 1 ? "#C8F135" : "#111"
-                        }}>{i + 1}</div>
-                        <span className="small fw-medium" style={{ color: paso === i + 1 ? "#111" : "#999" }}>{label}</span>
-                        {i < 2 && <div style={{ width: 20, height: 1, background: "#ddd" }} />}
-                    </div>
-                ))}
-            </div>
-
-            <div className="row g-4">
+            <div className="row g-4 align-items-start">
+                {/* COLUMNA IZQUIERDA: Info, Pasos y Calendario */}
                 <div className="col-md-7">
-                    <label className="form-label small fw-bold text-muted text-uppercase">1. Elige el día</label>
-                    <input type="date" className="form-control mb-4 shadow-sm" value={fecha} min={new Date().toISOString().split("T")[0]} 
-                           onChange={(e) => { setFecha(e.target.value); setHoraSeleccionada(""); setPaso(1); }} style={{ maxWidth: "200px", borderRadius: "10px" }} />
+                    {/* Cabecera */}
+                    <div className="mb-4">
+                        <h2 className="fw-bold mb-0" style={{ fontSize: "1.5rem", color: "#495057" }}>
+                            <i className="fa fa-building me-2"></i>
+                            {complejo?.nombre || cancha?.complejo_nombre || "Cargando complejo..."}
+                        </h2>
+                        <p className="text-muted small mb-2 ms-4 ps-1">
+                            <i className="fa fa-map-marker-alt me-1 text-danger"></i>
+                            {complejo?.city || complejo?.ciudad || "Ciudad"}, {complejo?.country || complejo?.pais || "País"}
+                        </p>
+                        <h3 className="fw-bold mb-0">{cancha?.nombre || "Cancha"}</h3>
+                        <span className="badge bg-light text-dark border mt-2">
+                            {cancha?.categoria_nombre || "General"}
+                        </span>
+                    </div>
 
+                    {/* Pasos Visuales */}
+                    <div className="d-flex align-items-center gap-3 mb-4">
+                        {["Fecha", "Horario", "Confirmar"].map((label, i) => (
+                            <div key={i} className="d-flex align-items-center gap-2">
+                                <div style={{
+                                    width: 28, height: 28, borderRadius: "50%", display: "flex",
+                                    alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: "bold",
+                                    background: paso === i + 1 ? "#0d1b2a" : paso > i + 1 ? "#C8F135" : "#eee",
+                                    color: paso === i + 1 ? "#C8F135" : "#111"
+                                }}>{i + 1}</div>
+                                <span className="small fw-medium" style={{ color: paso === i + 1 ? "#111" : "#999" }}>{label}</span>
+                                {i < 2 && <div style={{ width: 20, height: 1, background: "#ddd" }} />}
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Selección de Fecha */}
+                    <label className="form-label small fw-bold text-muted text-uppercase">1. Elige el día</label>
+                    <input
+                        type="date"
+                        className="form-control mb-4 shadow-sm"
+                        value={fecha}
+                        min={new Date().toISOString().split("T")[0]}
+                        onChange={(e) => { setFecha(e.target.value); setHoraSeleccionada(""); setPaso(1); }}
+                        style={{ maxWidth: "200px", borderRadius: "10px" }}
+                    />
+
+                    {/* Selección de Hora */}
                     <label className="form-label small fw-bold text-muted text-uppercase">2. Selecciona la hora</label>
                     <div className="d-flex flex-wrap gap-2 mt-2">
                         {generarHoras().map((h) => {
                             const res = reservas.find(r => r.fecha === fecha && r.hora === h);
-                            const esMia = res?.user_id === store.auth.user?.id;
-                            const bloqueo = res?.es_bloqueo;
                             const isSelected = horaSeleccionada === h;
-
-                            let color = "#EAF3DE"; let text = "#27500A"; let label = h;
-                            if (bloqueo) { color = "#ffcfcf"; text = "#a80000"; label = "CERRADO"; }
-                            else if (esMia) { color = "#fff3cd"; text = "#856404"; label = "Mi RESERVA"; }
-                            else if (res) { color = "#f8f9fa"; text = "#adb5bd"; label = "OCUPADO"; }
+                            let color = "#EAF3DE"; let text = "#27500A";
+                            if (res) { color = "#f8f9fa"; text = "#adb5bd"; }
                             else if (isSelected) { color = "#0d1b2a"; text = "#C8F135"; }
 
                             return (
-                                <div key={h} className="text-center" style={{ width: "105px" }}>
-                                    <button onClick={() => { setHoraSeleccionada(h); setPaso(2); }} 
-                                            className="btn btn-sm w-100 mb-1 shadow-sm"
-                                            style={{ fontSize: "10px", fontWeight: "700", padding: "12px 2px", background: color, color: text, border: isSelected ? "2px solid #0d1b2a" : "1px solid #ddd", borderRadius: "8px" }}>
-                                        {label}
-                                    </button>
-                                    {esMia && (
-                                        <div 
-                                            className="text-danger small fw-bold" 
-                                            style={{cursor:"pointer", textDecoration:"underline", fontSize: "10px"}} 
-                                            onClick={()=>cancelarReserva(res.id)}
-                                        >
-                                            CANCELAR
-                                        </div>
-                                    )}
-                                </div>
+                                <button
+                                    key={h}
+                                    onClick={() => { setHoraSeleccionada(h); setPaso(2); }}
+                                    className="btn btn-sm shadow-sm"
+                                    disabled={res}
+                                    style={{
+                                        width: "100px", fontWeight: "700", padding: "10px",
+                                        background: color, color: text,
+                                        border: isSelected ? "2px solid #0d1b2a" : "1px solid #ddd",
+                                        borderRadius: "8px"
+                                    }}
+                                >
+                                    {res ? (res.es_bloqueo ? "CERRADO" : "OCUPADO") : h}
+                                </button>
                             );
                         })}
                     </div>
                 </div>
 
+              
                 <div className="col-md-5">
                     <div className="p-4 bg-light shadow-sm" style={{ borderRadius: 15, border: "1px solid #eee" }}>
-                        {/* ALERTAS DINÁMICAS */}
-                        {horaSeleccionada && estaCerrada ? (
-                            <div className="alert alert-secondary border-0 mb-4 py-2 small" style={{ borderRadius: "10px", background: "#ffe5e5", color: "#a80000" }}>
-                                <i className="fa fa-ban me-2"></i><strong>Cancha no disponible</strong>
-                            </div>
-                        ) : horaSeleccionada && estaOcupada ? (
-                            <div className="alert alert-danger border-0 mb-4 py-2 small" style={{ borderRadius: "10px" }}>
-                                <i className="fa fa-times-circle me-2"></i><strong>Cancha ya reservada</strong>
-                            </div>
-                        ) : horaSeleccionada ? (
-                            <div className="alert alert-success border-0 mb-4 py-2 small" style={{ borderRadius: "10px" }}>
-                                <i className="fa fa-check-circle me-2"></i><strong>Cancha libre</strong>
-                            </div>
-                        ) : (
-                            <div className="alert alert-info border-0 mb-4 py-2 small" style={{ borderRadius: "10px" }}>
-                                <i className="fa fa-info-circle me-2"></i>Selecciona un horario
-                            </div>
-                        )}
+                        <h5 className="fw-bold mb-3 text-uppercase border-bottom pb-2" style={{ fontSize: "14px", color: "#0d1b2a" }}>
+                            <p className="mb-3 text-danger"><b>   Resumen del turno </b></p>
+                        </h5>
 
-                        <h6 className="fw-bold mb-3 text-uppercase" style={{ fontSize: "12px", letterSpacing: "1px" }}>Detalles del Turno</h6>
-                        <div className="d-flex justify-content-between mb-2 small border-bottom pb-1">
-                            <span className="text-muted">Complejo:</span>
-                            <span className="fw-bold text-dark">{complejo?.name || cancha?.complejo_nombre || "-"}</span>
-                        </div>
-                        <div className="d-flex justify-content-between mb-2 small border-bottom pb-1">
-                            <span className="text-muted">Cancha:</span>
-                            <span className="fw-bold text-dark">{cancha?.nombre || "-"}</span>
-                        </div>
-                        <div className="d-flex justify-content-between mb-2 small border-bottom pb-1">
-                            <span className="text-muted">Fecha:</span>
-                            <span className="fw-bold text-dark">{fecha}</span>
-                        </div>
-                        <div className="d-flex justify-content-between mb-2 small border-bottom pb-1">
-                            <span className="text-muted">Usuario:</span>
-                            <span className="fw-bold text-dark text-capitalize">{store.auth.user?.first_name || store.auth.user?.username || "Invitado"}</span>
-                        </div>
-                        <div className="d-flex justify-content-between mb-3 small">
-                            <span className="text-muted">Horario:</span>
-                            <span className={`fw-bold ${estaCerrada || estaOcupada ? "text-danger" : "text-success"}`}>
-                                {horaSeleccionada ? `${horaSeleccionada} hs` : "--:--"}
-                            </span>
+
+                        <div className="mb-3">
+                            <div className="d-flex justify-content-between mb-2 border-bottom pb-1 small">
+                                <span className="text-muted">Complejo:</span>
+                                <span className="fw-bold text-dark">{complejo?.nombre || cancha?.complejo_nombre || "---"}</span>
+                            </div>
+
+                            {/* Nuevo Campo: Teléfono */}
+                            <div className="d-flex justify-content-between mb-2 border-bottom pb-1 small">
+                                <span className="text-muted">Teléfono:</span>
+                                <span className="fw-bold text-dark">{complejo?.phone || complejo?.telefono || "---"}</span>
+                            </div>
+
+                            {/* Nuevo Campo: Correo */}
+                            <div className="d-flex justify-content-between mb-2 border-bottom pb-1 small">
+                                <span className="text-muted">Correo:</span>
+                                <span className="fw-bold text-dark" style={{ fontSize: '10px' }}>{complejo?.email || "---"}</span>
+                            </div>
+
+                            <div className="d-flex justify-content-between mb-2 border-bottom pb-1 small">
+                                <span className="text-muted">Ubicación:</span>
+                                <span className="fw-bold text-dark text-truncate ms-2">
+                                    {complejo?.city || "---"}, {complejo?.country || "---"}
+                                </span>
+                            </div>
+
+                            <div className="d-flex justify-content-between mb-2 border-bottom pb-1 small">
+                                <span className="text-muted">Cancha / Cat:</span>
+                                <span className="fw-bold text-dark">
+                                    {cancha?.nombre} ({cancha?.categoria_nombre || "Gral"})
+                                </span>
+                            </div>
+
+                            <div className="d-flex justify-content-between mb-2 border-bottom pb-1 small">
+                                <span className="text-muted">Usuario:</span>
+                                <span className="fw-bold text-dark text-capitalize">
+                                    {store.auth?.user?.first_name || store.auth?.user?.username || "Invitado"}
+                                </span>
+                            </div>
+
+                            <div className="d-flex justify-content-between mb-2 border-bottom pb-1 small">
+                                <span className="text-muted">Fecha:</span>
+                                <span className="fw-bold text-dark">{fecha}</span>
+                            </div>
+
+                            <div className="d-flex justify-content-between mb-1 small">
+                                <span className="text-muted">Horario:</span>
+                                <span className="fw-bold text-dark">{horaSeleccionada || "--:--"} hs</span>
+                            </div>
                         </div>
 
-                        <hr />
-                        <div className="d-flex justify-content-between align-items-center mb-4">
-                            <span className="fw-bold">Total:</span>
-                            <span className="fs-4 fw-bold text-success">${cancha?.precio_hora || "0"}</span>
+
+                        {/* Precios */}
+                        <div className="mt-4 p-3 bg-white rounded border shadow-sm">
+                            <div className="d-flex justify-content-between mb-2 small">
+                                <span className="text-muted fw-bold">VALOR TOTAL:</span>
+                                <span className="fw-bold text-dark">${Number(cancha?.precio_hora || 0).toLocaleString("es-CO")}</span>
+                            </div>
+
+                            <div className={`d-flex justify-content-between p-2 rounded border-start border-4 ${pagarTotal ? 'border-success bg-success bg-opacity-10' : 'border-primary bg-primary bg-opacity-10'}`}>
+                                <span className="fw-bold small" style={{ fontSize: '11px' }}>
+                                    {pagarTotal ? 'PAGO TOTAL AHORA:' : 'SEÑA REQUERIDA (10%):'}
+                                </span>
+                                <span className="fw-bold fs-6 text-dark">
+                                    ${(pagarTotal ? Number(cancha?.precio_hora || 0) : Number(cancha?.precio_hora || 0) * 0.1).toLocaleString("es-CO")}
+                                </span>
+                            </div>
+
+                            <div className="form-check mt-3 pt-2 border-top">
+                                <input
+                                    className="form-check-input"
+                                    type="checkbox"
+                                    id="pTotal"
+                                    checked={pagarTotal}
+                                    onChange={() => setPagarTotal(!pagarTotal)}
+                                    style={{ cursor: 'pointer' }}
+                                />
+                                <label className="form-check-label fw-bold small text-dark" htmlFor="pTotal" style={{ cursor: 'pointer', fontSize: '11px' }}>
+                                    QUIERO PAGAR EL TOTAL AHORA
+                                </label>
+                            </div>
                         </div>
 
-                        <button 
-                            className="btn w-100 py-2 fw-bold shadow-sm"
+                        <button
+                            className="btn w-100 py-3 fw-bold mt-4 shadow-sm"
+                            onClick={handleConfirmar}
                             disabled={!horaSeleccionada || estaOcupada}
-                            onClick={() => { setPaso(3); handleConfirmar(); }}
-                            style={{ background: "#C8F135", color: "#111", borderRadius: "10px" }}>
-                            CONFIRMAR RESERVA
+                            style={{
+                                borderRadius: "12px",
+                                background: horaSeleccionada && !estaOcupada ? (pagarTotal ? "#198754" : "#0d1b2a") : "#ccc",
+                                color: "#C8F135",
+                                border: "none",
+                                transition: "all 0.3s ease"
+                            }}
+                        >
+                            {pagarTotal ? 'CONFIRMAR Y PAGAR TOTAL' : 'CONFIRMAR Y PAGAR SEÑA'}
                         </button>
                     </div>
                 </div>
             </div>
         </div>
     );
+
 };
 
 export default ReservaCancha;
+
+
+

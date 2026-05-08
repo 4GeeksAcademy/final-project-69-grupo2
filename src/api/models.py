@@ -14,6 +14,7 @@ class Role(enum.Enum):
     ADMIN = "admin"
     USER = "user"
 
+
 class User(db.Model):
     __tablename__ = "users"
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -21,7 +22,8 @@ class User(db.Model):
         String(120), unique=True, nullable=False)
     username: Mapped[str] = mapped_column(String(120), nullable=False)
     full_name: Mapped[str] = mapped_column(String(120), nullable=True)
-    role: Mapped[Role] = mapped_column(db.Enum(Role), default=Role.USER, nullable=False)
+    role: Mapped[Role] = mapped_column(
+        db.Enum(Role), default=Role.USER, nullable=False)
     password: Mapped[str] = mapped_column(nullable=False)
     salt: Mapped[str] = mapped_column(String(120), nullable=False)
     avatar_url: Mapped[str] = mapped_column(
@@ -32,6 +34,8 @@ class User(db.Model):
         DateTime(timezone=True), server_default=func.now(), nullable=False)
     update_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False)
+    complejos: Mapped[list["Complejo"]] = relationship(
+        back_populates="owner", foreign_keys="Complejo.owner_id")
 
     def serialize(self):
         return {
@@ -68,8 +72,12 @@ class Complejo(db.Model):
     imagen_url: Mapped[str] = mapped_column(String(300), nullable=True)
     categoria_id: Mapped[int] = mapped_column(
         db.ForeignKey("categoria.id"), nullable=True)
+    owner_id: Mapped[int] = mapped_column(
+        db.ForeignKey("users.id"), nullable=True)
     categoria: Mapped["Categoria"] = relationship(back_populates="complejos")
     canchas: Mapped[list["Cancha"]] = relationship(back_populates="complejo")
+    owner: Mapped["User"] = relationship(
+        back_populates="complejos", foreign_keys=[owner_id])
 
     def serialize(self):
         return {
@@ -82,7 +90,8 @@ class Complejo(db.Model):
             "city": self.city,
             "google_map": self.google_map,
             "imagen_url": self.imagen_url,
-            "categoria": self.categoria.nombre if self.categoria else "Sin categoría"
+            "categoria": self.categoria.nombre if self.categoria else "Sin categoría",
+            "owner_id": self.owner_id
         }
 
 
@@ -126,15 +135,15 @@ class Reserva(db.Model):
     id: Mapped[int] = mapped_column(primary_key=True)
     fecha: Mapped[str] = mapped_column(String(20), nullable=False)
     hora: Mapped[str] = mapped_column(String(10), nullable=False)
-    es_bloqueo: Mapped[bool] = mapped_column(
-        db.Boolean, default=False, nullable=False)
+    es_bloqueo: Mapped[bool] = mapped_column(db.Boolean, default=False, nullable=False)
 
-    user_id: Mapped[int] = mapped_column(
-        db.ForeignKey("users.id"), nullable=True)
-    cancha_id: Mapped[int] = mapped_column(
-        db.ForeignKey("cancha.id"), nullable=False)
-    estado: Mapped[str] = mapped_column(
-        String(20), nullable=False, default="pendiente")
+    user_id: Mapped[int] = mapped_column(db.ForeignKey("users.id"), nullable=True)
+    cancha_id: Mapped[int] = mapped_column(db.ForeignKey("cancha.id"), nullable=False)
+    estado: Mapped[str] = mapped_column(String(20), nullable=False, default="pendiente")
+    
+    # ✅ NUEVOS CAMPOS PARA PAGOS
+    precio_total: Mapped[float] = mapped_column(db.Float, nullable=True, default=0.0)
+    monto_pagado: Mapped[float] = mapped_column(db.Float, nullable=True, default=0.0)
 
     user: Mapped["User"] = relationship()
     cancha: Mapped["Cancha"] = relationship(back_populates="reservas")
@@ -151,6 +160,8 @@ class Reserva(db.Model):
             "complejo_nombre": self.cancha.complejo.nombre if self.cancha and self.cancha.complejo else None,
             "complejo_id": self.cancha.complejo_id if self.cancha else None,
             "user": self.user.serialize() if self.user else None,
-            "estado": self.estado
+            "estado": self.estado,
+            # ✅ AGREGAR AL SERIALIZE
+            "precio_total": self.precio_total,
+            "monto_pagado": self.monto_pagado
         }
- 
