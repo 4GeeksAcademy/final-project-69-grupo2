@@ -5,8 +5,8 @@ import useGlobalReducer from "../hooks/useGlobalReducer.jsx";
 import Swal from "sweetalert2";
 import { loadStripe } from '@stripe/stripe-js';
 
-const stripePromise = loadStripe("pk_test_51TUDRHISwJbsFlBkBdqrlqrzzAOwNPMlrGMPl9Xxbf87OXt7sUU110JO25N0st4EXkRy4DY5iDPhHcMX8jEYcTiq00Y64lUMrW");
-
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY);
+                                  
 const ReservaCancha = ({ canchaDesdePadre = null }) => {
     const { canchaId } = useParams();
     const navigate = useNavigate();
