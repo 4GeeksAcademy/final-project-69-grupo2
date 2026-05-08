@@ -17,7 +17,7 @@ import os
 
 
 # Configura tu clave secreta (está en tu Dashboard de Stripe)
-stripe.api_key = os.getenv("STRIPE_SECRET_KEY", "sk_test_51TUDRHISwJbsFlBkW1wDuExlnONH9GUTSrCeOzfnbSmfqHlO47FVqEEZUzEwxzU2wCQg4eYXdzmSOE3TNkdqJHHm00Ketq09QR")
+stripe.api_key = os.getenv("STRIPE_SECRET_KEY" )
 
 api = Blueprint('api', __name__)
 CORS(api)
