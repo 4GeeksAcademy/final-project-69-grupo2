@@ -20,6 +20,7 @@ import { RecoveryPassword } from "./pages/RecoveryPassword";
 import { ActivateAccount } from "./pages/ActivationAccount";
 import { GestionHorarios } from "./pages/GestionHorarios.jsx";
 import { UserReservas } from "./pages/UserReservas.jsx";
+import CanchasPorCategoria from "./pages/CanchasPorCategoria";
 export const router = createBrowserRouter(
       createRoutesFromElements(
             <Route path="/" element={<Layout />}>
@@ -43,6 +44,7 @@ export const router = createBrowserRouter(
                   <Route path="/reservar/:canchaId" element={<ReservaCancha />} />
                   <Route path="/reservas" element={<Reservas />} />
                   <Route path="/ver-disponibilidad/:canchaId" element={<UserReservas />} />
+                  <Route path="/canchas-categoria" element={<CanchasPorCategoria />} />
 
             </Route>
       )

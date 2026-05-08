@@ -442,12 +442,21 @@ def delete_complejo(id):
 @api.route('/canchas', methods=['GET'])
 def get_canchas():
     complejo_id = request.args.get('complejo_id')
+    categoria_nombre = request.args.get('categoria')
+
+    query = Cancha.query
 
     if complejo_id:
-        canchas = Cancha.query.filter_by(complejo_id=complejo_id).all()
-    else:
-        canchas = Cancha.query.all()
+        query = query.filter_by(complejo_id=complejo_id)
 
+    if categoria_nombre:
+        categoria = Categoria.query.filter_by(nombre=categoria_nombre).first()
+        if categoria:
+            query = query.filter_by(categoria_id=categoria.id)
+        else:
+            return jsonify([]), 200
+
+    canchas = query.all()
     return jsonify([c.serialize() for c in canchas]), 200
 
 
