@@ -85,7 +85,7 @@ const Landing = () => {
           <div className="d-flex gap-3">
             <button className="btn" style={{ background: "#C8F135", color: "#111", fontWeight: 600, padding: "12px 24px", borderRadius: "8px" }}
               onClick={() => navigate("/")}>VER COMPLEJOS →</button>
-            <button className="btn btn-outline-light" style={{ padding: "12px 24px", borderRadius: "8px" }}>NUESTRAS ACTIVIDADES</button>
+            
           </div>
         </div>
 
@@ -177,7 +177,7 @@ const Landing = () => {
           <div className="row g-3">
             {categorias.map((cat, i) => (
               <div className="col-4" key={i}>
-                <div onClick={() => navigate(`/?categoria=${cat.nombre}`)}
+                <div onClick={() => navigate(`/canchas-categoria?categoria=${cat.nombre}`)}
                   style={{ cursor: "pointer", borderRadius: "12px", overflow: "hidden", position: "relative", height: "170px", transition: "transform 0.2s ease" }}
                   onMouseEnter={e => e.currentTarget.style.transform = "scale(1.02)"}
                   onMouseLeave={e => e.currentTarget.style.transform = "scale(1)"}>

@@ -84,6 +84,7 @@ import { RecoveryPassword } from "./pages/RecoveryPassword";
 import { ActivateAccount } from "./pages/ActivationAccount";
 import { GestionHorarios } from "./pages/GestionHorarios.jsx";
 import { UserReservas } from "./pages/UserReservas.jsx";
+import CanchasPorCategoria from "./pages/CanchasPorCategoria";
 import MisReservas from "./pages/MisReservas.jsx";
 import Reportes from "./pages/Reportes.jsx";
 import PagoExitoso from "./pages/PagoExitoso.jsx";
@@ -121,6 +122,11 @@ export const router = createBrowserRouter(
                   <Route path="/forgot-password" element={<ForgotPassword />} />
                   <Route path="/recovery-password" element={<RecoveryPassword />} />
                   <Route path="/activate-account" element={<ActivateAccount />} />
+                  <Route path="/reservar/:cancha_id" element={<ReservaCancha />} />
+                  <Route path="/reservar/:canchaId" element={<ReservaCancha />} />
+                  <Route path="/reservas" element={<Reservas />} />
+                  <Route path="/ver-disponibilidad/:canchaId" element={<UserReservas />} />
+                  <Route path="/canchas-categoria" element={<CanchasPorCategoria />} />
 
                   {/* Rutas Privadas del Usuario */}
                   <Route element={<ProtectedRoute />}>

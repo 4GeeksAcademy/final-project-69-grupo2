@@ -180,17 +180,35 @@ export const AddComplejoDeportivo = () => {
                             <div className="form-text">Pega aquí el enlace de "Compartir" de Google Maps.</div>
                         </div>
 
+                        {/* CAMPOS DE CIUDAD Y PAÍS */}
+                        {/* CAMPOS DE CIUDAD Y PAÍS */}
                         <div className="col-md-6">
-                            <label className="form-label fw-bold small">Email de Contacto</label>
-                            <input type="email" className="form-control" value={complejo.email} onChange={e => setComplejo({ ...complejo, email: e.target.value })} required />
+                            <label className="form-label fw-bold">País</label>
+                            <select className="form-select" value={complejo.country} onChange={e => setComplejo({ ...complejo, country: e.target.value, city: "" })} required>
+                                <option value="">Selecciona un país</option>
+                                {["Argentina", "Bolivia", "Brasil", "Chile", "Colombia", "Costa Rica", "Cuba", "Ecuador", "El Salvador", "Guatemala", "Haití", "Honduras", "Jamaica", "México", "Nicaragua", "Panamá", "Paraguay", "Perú", "Puerto Rico", "República Dominicana", "Trinidad y Tobago", "Uruguay", "Venezuela"].map(p => (
+                                    <option key={p} value={p}>{p}</option>
+                                ))}
+                            </select>
                         </div>
                         <div className="col-md-6">
-                            <label className="form-label fw-bold small">País</label>
-                            <input className="form-control" value={complejo.country} onChange={e => setComplejo({ ...complejo, country: e.target.value })} required />
-                        </div>
-                        <div className="col-md-6">
-                            <label className="form-label fw-bold small">Ciudad</label>
-                            <input className="form-control" value={complejo.city} onChange={e => setComplejo({ ...complejo, city: e.target.value })} required />
+                            <label className="form-label fw-bold">Ciudad</label>
+                            <select className="form-select" value={complejo.city} onChange={e => setComplejo({ ...complejo, city: e.target.value })} required disabled={!complejo.country}>
+                                <option value="">Selecciona una ciudad</option>
+                                {complejo.country === "Colombia" && ["Bogotá", "Medellín", "Cali", "Barranquilla", "Cartagena", "Bucaramanga", "Manizales", "Pereira", "Cúcuta", "Ibagué"].map(c => <option key={c} value={c}>{c}</option>)}
+                                {complejo.country === "Argentina" && ["Buenos Aires", "Córdoba", "Rosario", "Mendoza", "La Plata", "Tucumán", "Mar del Plata", "Salta", "Santa Fe", "San Juan"].map(c => <option key={c} value={c}>{c}</option>)}
+                                {complejo.country === "México" && ["Ciudad de México", "Guadalajara", "Monterrey", "Puebla", "Tijuana", "León", "Juárez", "Zapopan", "Mérida", "Cancún"].map(c => <option key={c} value={c}>{c}</option>)}
+                                {complejo.country === "Chile" && ["Santiago", "Valparaíso", "Concepción", "La Serena", "Antofagasta", "Temuco", "Rancagua", "Arica", "Iquique", "Talca"].map(c => <option key={c} value={c}>{c}</option>)}
+                                {complejo.country === "Venezuela" && ["Caracas", "Maracaibo", "Valencia", "Barquisimeto", "Maracay", "Ciudad Guayana", "Barcelona", "Maturín", "San Cristóbal", "Cumana"].map(c => <option key={c} value={c}>{c}</option>)}
+                                {complejo.country === "Perú" && ["Lima", "Arequipa", "Trujillo", "Chiclayo", "Piura", "Iquitos", "Cusco", "Chimbote", "Huancayo", "Tacna"].map(c => <option key={c} value={c}>{c}</option>)}
+                                {complejo.country === "Ecuador" && ["Quito", "Guayaquil", "Cuenca", "Santo Domingo", "Ambato", "Machala", "Durán", "Portoviejo", "Manta", "Loja"].map(c => <option key={c} value={c}>{c}</option>)}
+                                {complejo.country === "Bolivia" && ["La Paz", "Santa Cruz", "Cochabamba", "Oruro", "Sucre", "Potosí", "Tarija", "Trinidad", "Cobija", "Riberalta"].map(c => <option key={c} value={c}>{c}</option>)}
+                                {complejo.country === "Uruguay" && ["Montevideo", "Salto", "Ciudad de la Costa", "Paysandú", "Las Piedras", "Rivera", "Maldonado", "Tacuarembó", "Melo", "Mercedes"].map(c => <option key={c} value={c}>{c}</option>)}
+                                {complejo.country === "Paraguay" && ["Asunción", "Ciudad del Este", "San Lorenzo", "Luque", "Capiatá", "Lambaré", "Fernando de la Mora", "Limpio", "Ñemby", "Encarnación"].map(c => <option key={c} value={c}>{c}</option>)}
+                                {!["Colombia", "Argentina", "México", "Chile", "Venezuela", "Perú", "Ecuador", "Bolivia", "Uruguay", "Paraguay"].includes(complejo.country) && complejo.country && (
+                                    <option value="Otra ciudad">Otra ciudad</option>
+                                )}
+                            </select>
                         </div>
                         <div className="col-md-4">
                             <label className="form-label fw-bold small">Teléfono</label>
