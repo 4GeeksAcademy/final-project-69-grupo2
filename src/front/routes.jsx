@@ -84,8 +84,10 @@ import { RecoveryPassword } from "./pages/RecoveryPassword";
 import { ActivateAccount } from "./pages/ActivationAccount";
 import { GestionHorarios } from "./pages/GestionHorarios.jsx";
 import { UserReservas } from "./pages/UserReservas.jsx";
+import MisReservas from "./pages/MisReservas.jsx";
+import Reportes from "./pages/Reportes.jsx";
 import PagoExitoso from "./pages/PagoExitoso.jsx";
-import { ProtectedRoute } from "./components/ProtectedRoute.jsx"; 
+import { ProtectedRoute } from "./components/ProtectedRoute.jsx";
 
 export const router = createBrowserRouter(
       createRoutesFromElements(
@@ -106,6 +108,9 @@ export const router = createBrowserRouter(
                   <Route path="/reservar/:canchaId" element={<ReservaCancha />} />
                   <Route path="/ver-disponibilidad/:canchaId" element={<UserReservas />} />
                   <Route path="/reservas" element={<Reservas />} />
+                  <Route path="/mis-reservas" element={<MisReservas />} />
+                  <Route path="/reportes" element={<Reportes />} />
+                  <Route path="/todos-complejos" element={<Complejos />} />
 
                   {/* Stripe Flow */}
                   <Route path="/pago-exitoso" element={<PagoExitoso />} />
@@ -119,7 +124,7 @@ export const router = createBrowserRouter(
 
                   {/* Rutas Privadas del Usuario */}
                   <Route element={<ProtectedRoute />}>
-                    <Route path="/mis-reservas" element={<UserReservas />} />
+                        <Route path="/mis-reservas" element={<UserReservas />} />
                   </Route>
 
                   {/* Otros */}
