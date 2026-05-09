@@ -1,6 +1,8 @@
 """
 This module takes care of starting the API Server, Loading the DB and Adding the endpoints
 """
+from api.models import db, Reserva, User
+from flask import jsonify, request, Blueprint, make_response
 from flask import Flask, request, jsonify, url_for, Blueprint
 from sqlalchemy.exc import IntegrityError
 from api.utils import generate_sitemap, APIException, validate_email, send_email
@@ -12,6 +14,12 @@ import os
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity, JWTManager, get_jwt, decode_token
 from datetime import timedelta
 import cloudinary.uploader as cloudinary_upload
+import stripe
+import os
+
+
+# Configura tu clave secreta (está en tu Dashboard de Stripe)
+stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 
 api = Blueprint('api', __name__)
 CORS(api)
@@ -591,34 +599,26 @@ def get_reservas_cancha(cancha_id):
 # Crear una nueva reserva o un bloqueo
 
 
-@api.route('/reserva', methods=['POST'])
+# ... tus otros imports ...
+
+
+@api.route('/reserva', methods=['POST', 'OPTIONS'])
 def add_reserva():
+    # ✅ Manejo de Preflight CORS
+    if request.method == 'OPTIONS':
+        response = make_response()
+        response.headers.add("Access-Control-Allow-Origin", "*")
+        response.headers.add('Access-Control-Allow-Headers', "*")
+        response.headers.add('Access-Control-Allow-Methods', "POST, OPTIONS")
+        return response, 200
+
     data = request.get_json()
-
-    # Validamos datos mínimos
-    if not data.get("fecha") or not data.get("hora") or not data.get("cancha_id"):
-        return jsonify({"error": "Faltan datos obligatorios: fecha, hora, cancha_id"}), 400
-
     es_bloqueo = data.get("es_bloqueo", False)
     user_id = data.get("user_id")
 
-    # Si no es bloqueo, user_id es obligatorio
-    if not es_bloqueo and not user_id:
-        return jsonify({"error": "user_id es requerido para reservas de usuarios"}), 400
-
-    # Si se proporciona user_id, verificar que exista
-    if user_id:
-        user = User.query.get(user_id)
-        if not user:
-            return jsonify({"error": "Usuario no encontrado"}), 404
-
-    reserva_existente = Reserva.query.filter_by(
-        cancha_id=data.get("cancha_id"),
-        fecha=data.get("fecha"),
-        hora=data.get("hora")
-    ).first()
-    if reserva_existente:
-        return jsonify({"error": "Ese horario ya está ocupado"}), 409
+    # Validaciones básicas
+    if not data.get("fecha") or not data.get("hora") or not data.get("cancha_id"):
+        return jsonify({"error": "Faltan datos obligatorios"}), 400
 
     nueva_reserva = Reserva(
         fecha=data.get("fecha"),
@@ -626,28 +626,42 @@ def add_reserva():
         cancha_id=data.get("cancha_id"),
         es_bloqueo=es_bloqueo,
         user_id=user_id,
-        estado="pendiente"
+        estado="confirmado" if es_bloqueo else "pendiente"
     )
 
     try:
         db.session.add(nueva_reserva)
         db.session.commit()
-        return jsonify(nueva_reserva.serialize()), 201
+        resp = jsonify(nueva_reserva.serialize())
+        resp.headers.add("Access-Control-Allow-Origin",
+                         "*")  # ✅ Header necesario
+        return resp, 201
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
 
 
-@api.route('/reserva/<int:id>', methods=['DELETE'])
+@api.route('/reserva/<int:id>', methods=['DELETE', 'OPTIONS'])
 def delete_reserva(id):
+    # ✅ Manejo de Preflight CORS
+    if request.method == 'OPTIONS':
+        response = make_response()
+        response.headers.add("Access-Control-Allow-Origin", "*")
+        response.headers.add('Access-Control-Allow-Headers', "*")
+        response.headers.add('Access-Control-Allow-Methods', "DELETE, OPTIONS")
+        return response, 200
+
     reserva = Reserva.query.get(id)
     if not reserva:
-        return jsonify({"msg": "La reserva o bloqueo no existe"}), 404
+        return jsonify({"msg": "No existe"}), 404
 
     try:
         db.session.delete(reserva)
         db.session.commit()
-        return jsonify({"msg": "Horario liberado correctamente"}), 200
+        resp = jsonify({"msg": "Horario liberado"})
+        resp.headers.add("Access-Control-Allow-Origin",
+                         "*")  # ✅ Header necesario
+        return resp, 200
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
@@ -874,3 +888,93 @@ def get_admin_complejos():
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@api.route('/create-checkout-session', methods=['POST', 'OPTIONS'])
+def create_checkout_session():
+    if request.method == 'OPTIONS':
+        return '', 200
+
+    try:
+        data = request.json
+        reserva_id = data.get('reserva_id')
+        nombre_pago = data.get('nombre', 'Reserva de Cancha')
+
+        # Identificar el tipo de pago para la metadata
+        tipo_pago = "total" if "Total" in nombre_pago else "senia"
+
+        checkout_session = stripe.checkout.Session.create(
+            payment_method_types=['card'],
+            # ✅ Guardamos el ID en client_reference_id para asegurar la compatibilidad
+            client_reference_id=reserva_id,
+            # ✅ Guardamos info extra en metadata
+            metadata={
+                "reserva_id": reserva_id,
+                "tipo_pago": tipo_pago
+            },
+            line_items=[{
+                'price_data': {
+                    'currency': 'usd',
+                    'product_data': {
+                        'name': nombre_pago
+                    },
+                    'unit_amount': int(float(data.get('precio', 0)) * 100),
+                },
+                'quantity': 1,
+            }],
+            mode='payment',
+            success_url=data['success_url'] +
+            "?session_id={CHECKOUT_SESSION_ID}",
+            cancel_url=data['cancel_url'],
+        )
+        return jsonify({'url': checkout_session.url}), 200
+
+    except Exception as e:
+        print(f"Error en Stripe Session: {str(e)}")
+        return jsonify(error=str(e)), 403
+
+
+@api.route('/confirmar-pago', methods=['POST'])
+def confirmar_pago():
+    data = request.get_json()
+    session_id = data.get("session_id")
+
+    try:
+        # 1. Recuperamos la sesión de Stripe
+        session = stripe.checkout.Session.retrieve(session_id)
+
+        # 2. Extraemos el ID de la reserva de forma segura
+        # Intentamos sacarlo de 'client_reference_id' y si no, de 'metadata'
+        reserva_id = getattr(session, 'client_reference_id', None)
+        if not reserva_id and hasattr(session, 'metadata'):
+            reserva_id = session.metadata.get("reserva_id")
+
+        if not reserva_id:
+            print("❌ Error: No se encontró reserva_id en la sesión de Stripe")
+            return jsonify({"success": False, "error": "ID de reserva ausente"}), 400
+
+        # 3. Buscamos la reserva en la base de datos
+        reserva = Reserva.query.get(reserva_id)
+        if not reserva:
+            print(f"❌ Error: La reserva {reserva_id} no existe en la DB")
+            return jsonify({"success": False, "error": "Reserva no encontrada"}), 404
+
+        # 4. Actualizamos y guardamos
+        if session.payment_status == "paid":
+            reserva.estado = "pagado"
+            reserva.monto_pagado = session.amount_total / 100
+            db.session.commit()
+            print(f"✅ ¡ÉXITO! Reserva {reserva_id} actualizada correctamente")
+
+            return jsonify({
+                "success": True,
+                "cancha": "Confirmada"
+            }), 200
+        else:
+            return jsonify({"success": False, "error": "El pago no está aprobado"}), 400
+
+    except Exception as e:
+        db.session.rollback()
+        # Aquí imprimiremos el error exacto para que lo veas en la terminal
+        print(f"DEBUG ERROR: {str(e)}")
+        return jsonify({"success": False, "error": "Error interno del servidor"}), 500
