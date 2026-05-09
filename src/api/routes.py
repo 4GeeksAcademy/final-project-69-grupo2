@@ -1,6 +1,8 @@
 """
 This module takes care of starting the API Server, Loading the DB and Adding the endpoints
 """
+from api.models import db, Reserva, User
+from flask import jsonify, request, Blueprint, make_response
 from flask import Flask, request, jsonify, url_for, Blueprint
 from sqlalchemy.exc import IntegrityError
 from api.utils import generate_sitemap, APIException, validate_email, send_email
@@ -12,6 +14,12 @@ import os
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity, JWTManager, get_jwt, decode_token
 from datetime import timedelta
 import cloudinary.uploader as cloudinary_upload
+import stripe
+import os
+
+
+# Configura tu clave secreta (está en tu Dashboard de Stripe)
+stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 
 api = Blueprint('api', __name__)
 CORS(api)
@@ -183,6 +191,32 @@ def profile():
         return jsonify({"error": "User not found"}), 404
     return jsonify({"message": "This is the profile endpoint.",
                     "user": user.serialize()}), 200
+
+
+@api.route('/users/<int:user_id>/reservas', methods=['GET'])
+@jwt_required()
+def get_user_reservas(user_id):
+    """
+    Obtiene el historial de reservas de un usuario.
+    Solo el usuario mismo o un administrador puede acceder a sus reservas.
+    """
+    current_user_id = get_jwt_identity()
+    current_user = User.query.get(int(current_user_id))
+
+    # Verificar que el usuario exista
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"error": "Usuario no encontrado"}), 404
+
+    # Verificar permisos: solo el usuario o un admin pueden ver sus reservas
+    if current_user.id != user_id and current_user.role != Role.ADMIN and current_user.role != Role.SUPER_ADMIN:
+        return jsonify({"error": "No tiene permisos para ver estas reservas"}), 403
+
+    # Obtener todas las reservas del usuario ordenadas por fecha descendente
+    reservas = Reserva.query.filter_by(
+        user_id=user_id, es_bloqueo=False).order_by(Reserva.fecha.desc()).all()
+
+    return jsonify([res.serialize() for res in reservas]), 200
 
 
 @api.route('/example-email', methods=['GET'])
@@ -574,34 +608,26 @@ def get_reservas_cancha(cancha_id):
 # Crear una nueva reserva o un bloqueo
 
 
-@api.route('/reserva', methods=['POST'])
+# ... tus otros imports ...
+
+
+@api.route('/reserva', methods=['POST', 'OPTIONS'])
 def add_reserva():
+    # ✅ Manejo de Preflight CORS
+    if request.method == 'OPTIONS':
+        response = make_response()
+        response.headers.add("Access-Control-Allow-Origin", "*")
+        response.headers.add('Access-Control-Allow-Headers', "*")
+        response.headers.add('Access-Control-Allow-Methods', "POST, OPTIONS")
+        return response, 200
+
     data = request.get_json()
-
-    # Validamos datos mínimos
-    if not data.get("fecha") or not data.get("hora") or not data.get("cancha_id"):
-        return jsonify({"error": "Faltan datos obligatorios: fecha, hora, cancha_id"}), 400
-
     es_bloqueo = data.get("es_bloqueo", False)
     user_id = data.get("user_id")
 
-    # Si no es bloqueo, user_id es obligatorio
-    if not es_bloqueo and not user_id:
-        return jsonify({"error": "user_id es requerido para reservas de usuarios"}), 400
-
-    # Si se proporciona user_id, verificar que exista
-    if user_id:
-        user = User.query.get(user_id)
-        if not user:
-            return jsonify({"error": "Usuario no encontrado"}), 404
-
-    reserva_existente = Reserva.query.filter_by(
-        cancha_id=data.get("cancha_id"),
-        fecha=data.get("fecha"),
-        hora=data.get("hora")
-    ).first()
-    if reserva_existente:
-        return jsonify({"error": "Ese horario ya está ocupado"}), 409
+    # Validaciones básicas
+    if not data.get("fecha") or not data.get("hora") or not data.get("cancha_id"):
+        return jsonify({"error": "Faltan datos obligatorios"}), 400
 
     nueva_reserva = Reserva(
         fecha=data.get("fecha"),
@@ -609,28 +635,355 @@ def add_reserva():
         cancha_id=data.get("cancha_id"),
         es_bloqueo=es_bloqueo,
         user_id=user_id,
-        estado="pendiente"
+        estado="confirmado" if es_bloqueo else "pendiente"
     )
 
     try:
         db.session.add(nueva_reserva)
         db.session.commit()
-        return jsonify(nueva_reserva.serialize()), 201
+        resp = jsonify(nueva_reserva.serialize())
+        resp.headers.add("Access-Control-Allow-Origin",
+                         "*")  # ✅ Header necesario
+        return resp, 201
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
 
 
-@api.route('/reserva/<int:id>', methods=['DELETE'])
+@api.route('/reserva/<int:id>', methods=['DELETE', 'OPTIONS'])
 def delete_reserva(id):
+    # ✅ Manejo de Preflight CORS
+    if request.method == 'OPTIONS':
+        response = make_response()
+        response.headers.add("Access-Control-Allow-Origin", "*")
+        response.headers.add('Access-Control-Allow-Headers', "*")
+        response.headers.add('Access-Control-Allow-Methods', "DELETE, OPTIONS")
+        return response, 200
+
     reserva = Reserva.query.get(id)
     if not reserva:
-        return jsonify({"msg": "La reserva o bloqueo no existe"}), 404
+        return jsonify({"msg": "No existe"}), 404
 
     try:
         db.session.delete(reserva)
         db.session.commit()
-        return jsonify({"msg": "Horario liberado correctamente"}), 200
+        resp = jsonify({"msg": "Horario liberado"})
+        resp.headers.add("Access-Control-Allow-Origin",
+                         "*")  # ✅ Header necesario
+        return resp, 200
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
+
+
+@api.route('/admin/reportes', methods=['GET'])
+@jwt_required()
+def get_admin_reports():
+    """
+    Obtiene un reporte de reservas para el admin.
+        Solo admins pueden acceder a este endpoint.
+        El admin solo ve reservas de sus propios complejos.
+
+        Query parameters:
+        - complejo_id (int): Filtrar por ID de complejo
+        - cancha_id (int): Filtrar por ID de cancha
+        - fecha (str): Filtrar por fecha (YYYY-MM-DD)
+        - fecha_inicio (str): Fecha inicio rango (YYYY-MM-DD)
+        - fecha_fin (str): Fecha fin rango (YYYY-MM-DD)
+        - estado (str): Filtrar por estado (pendiente, confirmada, cancelada)
+    """
+    try:
+        current_user_id = get_jwt_identity()
+        current_user = User.query.get(int(current_user_id))
+
+        if not current_user:
+            return jsonify({"error": "Usuario no encontrado"}), 404
+
+        # Verificar que sea admin o super_admin
+        if current_user.role not in [Role.ADMIN, Role.SUPER_ADMIN]:
+            return jsonify({"error": "Acceso denegado. Solo administradores pueden ver reportes"}), 403
+
+        # Obtener parámetros de filtro
+        complejo_id = request.args.get("complejo_id", type=int)
+        cancha_id = request.args.get("cancha_id", type=int)
+        fecha = request.args.get("fecha", type=str)
+        fecha_inicio = request.args.get("fecha_inicio", type=str)
+        fecha_fin = request.args.get("fecha_fin", type=str)
+        estado = request.args.get("estado", type=str)
+
+        # Obtener los complejos del admin
+        admin_complejos = Complejo.query.filter_by(
+            owner_id=current_user.id).all()
+        admin_complejo_ids = [c.id for c in admin_complejos]
+
+        if not admin_complejo_ids:
+            return jsonify([]), 200  # Sin complejos, sin reservas
+
+        # Construir query base
+        query = db.session.query(Reserva).join(Cancha).filter(
+            Cancha.complejo_id.in_(admin_complejo_ids),
+            Reserva.es_bloqueo == False  # Excluir bloqueos
+        )
+
+        # Aplicar filtros
+        if complejo_id:
+            # Verificar que el complejo pertenezca al admin
+            if complejo_id not in admin_complejo_ids:
+                return jsonify({"error": "No tienes acceso a este complejo"}), 403
+            query = query.filter(Cancha.complejo_id == complejo_id)
+
+        if cancha_id:
+            # Verificar que la cancha pertenezca a uno de sus complejos
+            cancha = Cancha.query.get(cancha_id)
+            if not cancha or cancha.complejo_id not in admin_complejo_ids:
+                return jsonify({"error": "No tienes acceso a esta cancha"}), 403
+            query = query.filter(Reserva.cancha_id == cancha_id)
+
+        if fecha:
+            query = query.filter(Reserva.fecha == fecha)
+
+        if fecha_inicio and fecha_fin:
+            query = query.filter(
+                Reserva.fecha >= fecha_inicio,
+                Reserva.fecha <= fecha_fin
+            )
+        elif fecha_inicio:
+            query = query.filter(Reserva.fecha >= fecha_inicio)
+        elif fecha_fin:
+            query = query.filter(Reserva.fecha <= fecha_fin)
+
+        if estado:
+            query = query.filter(Reserva.estado == estado)
+
+        # Ejecutar query y ordenar por fecha descendente
+        reservas = query.order_by(
+            Reserva.fecha.desc(), Reserva.hora.desc()).all()
+
+        return jsonify([res.serialize() for res in reservas]), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@api.route('/admin/reportes/estadisticas', methods=['GET'])
+@jwt_required()
+def get_admin_statistics():
+    """
+    Obtiene estadísticas de reservas para el admin.
+    Solo admins pueden acceder a este endpoint.
+    """
+    try:
+        current_user_id = get_jwt_identity()
+        current_user = User.query.get(int(current_user_id))
+
+        if not current_user:
+            return jsonify({"error": "Usuario no encontrado"}), 404
+
+        # Verificar que sea admin o super_admin
+        if current_user.role not in [Role.ADMIN, Role.SUPER_ADMIN]:
+            return jsonify({"error": "Acceso denegado. Solo administradores"}), 403
+
+        # Obtener parámetros
+        fecha_inicio = request.args.get("fecha_inicio", type=str)
+        fecha_fin = request.args.get("fecha_fin", type=str)
+
+        # Obtener los complejos del admin
+        admin_complejos = Complejo.query.filter_by(
+            owner_id=current_user.id).all()
+        admin_complejo_ids = [c.id for c in admin_complejos]
+
+        if not admin_complejo_ids:
+            return jsonify({
+                "total_reservas": 0,
+                "confirmadas": 0,
+                "pendientes": 0,
+                "canceladas": 0,
+                "por_complejo": [],
+                "por_cancha": [],
+                "por_dia": []
+            }), 200
+
+        # Query base
+        query = db.session.query(Reserva).join(Cancha).filter(
+            Cancha.complejo_id.in_(admin_complejo_ids),
+            Reserva.es_bloqueo == False
+        )
+
+        # Aplicar rango de fechas
+        if fecha_inicio and fecha_fin:
+            query = query.filter(
+                Reserva.fecha >= fecha_inicio,
+                Reserva.fecha <= fecha_fin
+            )
+        elif fecha_inicio:
+            query = query.filter(Reserva.fecha >= fecha_inicio)
+        elif fecha_fin:
+            query = query.filter(Reserva.fecha <= fecha_fin)
+
+        reservas = query.all()
+
+        # Calcular estadísticas
+        total = len(reservas)
+        confirmadas = sum(1 for r in reservas if r.estado == "confirmada")
+        pendientes = sum(1 for r in reservas if r.estado == "pendiente")
+        canceladas = sum(1 for r in reservas if r.estado == "cancelada")
+
+        # Por complejo
+        por_complejo = {}
+        for r in reservas:
+            complejo_nombre = r.cancha.complejo.nombre if r.cancha and r.cancha.complejo else "Sin complejo"
+            if complejo_nombre not in por_complejo:
+                por_complejo[complejo_nombre] = {
+                    "total": 0, "confirmadas": 0}
+            por_complejo[complejo_nombre]["total"] += 1
+            if r.estado == "confirmada":
+                por_complejo[complejo_nombre]["confirmadas"] += 1
+
+        # Por cancha
+        por_cancha = {}
+        for r in reservas:
+            cancha_nombre = r.cancha.nombre if r.cancha else "Sin cancha"
+            if cancha_nombre not in por_cancha:
+                por_cancha[cancha_nombre] = {"total": 0, "confirmadas": 0}
+                por_cancha[cancha_nombre]["total"] += 1
+            if r.estado == "confirmada":
+                por_cancha[cancha_nombre]["confirmadas"] += 1
+
+        # Por día
+        por_dia = {}
+        for r in reservas:
+            fecha = r.fecha
+            if fecha not in por_dia:
+                por_dia[fecha] = {"total": 0, "confirmadas": 0}
+                por_dia[fecha]["total"] += 1
+            if r.estado == "confirmada":
+                por_dia[fecha]["confirmadas"] += 1
+
+        return jsonify({
+            "total_reservas": total,
+            "confirmadas": confirmadas,
+            "pendientes": pendientes,
+            "canceladas": canceladas,
+            "por_complejo": por_complejo,
+            "por_cancha": por_cancha,
+            "por_dia": por_dia
+        }), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@api.route('/admin/complejos', methods=['GET'])
+@jwt_required()
+def get_admin_complejos():
+    """
+    Obtiene los complejos que pertenecen al admin autenticado.
+    """
+    try:
+        current_user_id = get_jwt_identity()
+        current_user = User.query.get(int(current_user_id))
+
+        if not current_user:
+            return jsonify({"error": "Usuario no encontrado"}), 404
+
+        # Verificar que sea admin o super_admin
+        if current_user.role not in [Role.ADMIN, Role.SUPER_ADMIN]:
+            return jsonify({"error": "Acceso denegado"}), 403
+
+        complejos = Complejo.query.filter_by(
+            owner_id=current_user.id).all()
+
+        return jsonify([c.serialize() for c in complejos]), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@api.route('/create-checkout-session', methods=['POST', 'OPTIONS'])
+def create_checkout_session():
+    if request.method == 'OPTIONS':
+        return '', 200
+
+    try:
+        data = request.json
+        reserva_id = data.get('reserva_id')
+        nombre_pago = data.get('nombre', 'Reserva de Cancha')
+
+        # Identificar el tipo de pago para la metadata
+        tipo_pago = "total" if "Total" in nombre_pago else "senia"
+
+        checkout_session = stripe.checkout.Session.create(
+            payment_method_types=['card'],
+            # ✅ Guardamos el ID en client_reference_id para asegurar la compatibilidad
+            client_reference_id=reserva_id,
+            # ✅ Guardamos info extra en metadata
+            metadata={
+                "reserva_id": reserva_id,
+                "tipo_pago": tipo_pago
+            },
+            line_items=[{
+                'price_data': {
+                    'currency': 'usd',
+                    'product_data': {
+                        'name': nombre_pago
+                    },
+                    'unit_amount': int(float(data.get('precio', 0)) * 100),
+                },
+                'quantity': 1,
+            }],
+            mode='payment',
+            success_url=data['success_url'] +
+            "?session_id={CHECKOUT_SESSION_ID}",
+            cancel_url=data['cancel_url'],
+        )
+        return jsonify({'url': checkout_session.url}), 200
+
+    except Exception as e:
+        print(f"Error en Stripe Session: {str(e)}")
+        return jsonify(error=str(e)), 403
+
+
+@api.route('/confirmar-pago', methods=['POST'])
+def confirmar_pago():
+    data = request.get_json()
+    session_id = data.get("session_id")
+
+    try:
+        # 1. Recuperamos la sesión de Stripe
+        session = stripe.checkout.Session.retrieve(session_id)
+
+        # 2. Extraemos el ID de la reserva de forma segura
+        # Intentamos sacarlo de 'client_reference_id' y si no, de 'metadata'
+        reserva_id = getattr(session, 'client_reference_id', None)
+        if not reserva_id and hasattr(session, 'metadata'):
+            reserva_id = session.metadata.get("reserva_id")
+
+        if not reserva_id:
+            print("❌ Error: No se encontró reserva_id en la sesión de Stripe")
+            return jsonify({"success": False, "error": "ID de reserva ausente"}), 400
+
+        # 3. Buscamos la reserva en la base de datos
+        reserva = Reserva.query.get(reserva_id)
+        if not reserva:
+            print(f"❌ Error: La reserva {reserva_id} no existe en la DB")
+            return jsonify({"success": False, "error": "Reserva no encontrada"}), 404
+
+        # 4. Actualizamos y guardamos
+        if session.payment_status == "paid":
+            reserva.estado = "pagado"
+            reserva.monto_pagado = session.amount_total / 100
+            db.session.commit()
+            print(f"✅ ¡ÉXITO! Reserva {reserva_id} actualizada correctamente")
+
+            return jsonify({
+                "success": True,
+                "cancha": "Confirmada"
+            }), 200
+        else:
+            return jsonify({"success": False, "error": "El pago no está aprobado"}), 400
+
+    except Exception as e:
+        db.session.rollback()
+        # Aquí imprimiremos el error exacto para que lo veas en la terminal
+        print(f"DEBUG ERROR: {str(e)}")
+        return jsonify({"success": False, "error": "Error interno del servidor"}), 500

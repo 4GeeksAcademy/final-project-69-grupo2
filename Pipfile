@@ -21,6 +21,7 @@ sqlalchemy = "*"
 sendgrid = "*"
 flask-cors = "*"
 cloudinary = "*"
+stripe = "*"
 
 [requires]
 python_version = "3.13"

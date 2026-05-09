@@ -135,15 +135,15 @@ class Reserva(db.Model):
     id: Mapped[int] = mapped_column(primary_key=True)
     fecha: Mapped[str] = mapped_column(String(20), nullable=False)
     hora: Mapped[str] = mapped_column(String(10), nullable=False)
-    es_bloqueo: Mapped[bool] = mapped_column(
-        db.Boolean, default=False, nullable=False)
+    es_bloqueo: Mapped[bool] = mapped_column(db.Boolean, default=False, nullable=False)
 
-    user_id: Mapped[int] = mapped_column(
-        db.ForeignKey("users.id"), nullable=True)
-    cancha_id: Mapped[int] = mapped_column(
-        db.ForeignKey("cancha.id"), nullable=False)
-    estado: Mapped[str] = mapped_column(
-        String(20), nullable=False, default="pendiente")
+    user_id: Mapped[int] = mapped_column(db.ForeignKey("users.id"), nullable=True)
+    cancha_id: Mapped[int] = mapped_column(db.ForeignKey("cancha.id"), nullable=False)
+    estado: Mapped[str] = mapped_column(String(20), nullable=False, default="pendiente")
+    
+    # ✅ NUEVOS CAMPOS PARA PAGOS
+    precio_total: Mapped[float] = mapped_column(db.Float, nullable=True, default=0.0)
+    monto_pagado: Mapped[float] = mapped_column(db.Float, nullable=True, default=0.0)
 
     user: Mapped["User"] = relationship()
     cancha: Mapped["Cancha"] = relationship(back_populates="reservas")
@@ -159,5 +159,9 @@ class Reserva(db.Model):
             "cancha_nombre": self.cancha.nombre if self.cancha else None,
             "complejo_nombre": self.cancha.complejo.nombre if self.cancha and self.cancha.complejo else None,
             "complejo_id": self.cancha.complejo_id if self.cancha else None,
-            "estado": self.estado
+            "user": self.user.serialize() if self.user else None,
+            "estado": self.estado,
+            # ✅ AGREGAR AL SERIALIZE
+            "precio_total": self.precio_total,
+            "monto_pagado": self.monto_pagado
         }

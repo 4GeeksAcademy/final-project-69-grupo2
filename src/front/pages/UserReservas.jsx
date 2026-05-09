@@ -16,7 +16,7 @@ export const UserReservas = ({ manualCanchaId }) => {
     const [fecha, setFecha] = useState(new Date().toISOString().split("T")[0]);
     const [cargando, setCargando] = useState(false);
     
-    // Estado para manejar la vista como en Reservas.jsx
+   
     const [canchaSeleccionada, setCanchaSeleccionada] = useState(null);
 
     const backendUrl = import.meta.env.VITE_BACKEND_URL.replace(/\/$/, "");
@@ -78,7 +78,7 @@ export const UserReservas = ({ manualCanchaId }) => {
 
     if (!cancha && !cargando) return <div className="text-center p-5">Cargando datos...</div>;
 
-    // Renderizado condicional igual que en tu archivo Reservas.jsx
+   
     if (canchaSeleccionada) {
         return (
             <div className="animate__animated animate__fadeIn container mt-3">
@@ -98,11 +98,12 @@ export const UserReservas = ({ manualCanchaId }) => {
             <div className="d-flex justify-content-between align-items-center mb-4">
                 <div>
                     <h5 className="text-muted small mb-0">{complejo?.nombre || complejo?.name || "Complejo"}</h5>
+                    <h5 className="text-muted small mb-0">{complejo?.city || "Ubicación"}, {complejo?.country || "Ubicación"}</h5>
                     <h4 className="fw-bold mb-1">{cancha?.nombre}</h4>
                     <div className="d-flex align-items-center gap-3 mt-2">
                         <span className="badge bg-light text-primary border">Disponibilidad</span>
                         
-                        {/* BOTÓN ACTUALIZADO: Ahora activa la vista de horarios como el original */}
+                   
                         <button
                             className="btn btn-sm shadow-sm"
                             style={{ background: "#C8F135", color: "#111", fontWeight: 700, borderRadius: "8px", padding: "5px 15px" }}
