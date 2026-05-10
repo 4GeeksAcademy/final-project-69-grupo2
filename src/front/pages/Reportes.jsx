@@ -9,6 +9,8 @@ import "../pages/css/global.css";
 
 const Reportes = () => {
     const { store } = useGlobalReducer();
+    const userRole = String(store.auth?.user?.role || "").toLowerCase();
+    const isSuperAdmin = userRole === "super_admin";
     const [reservas, setReservas] = useState([]);
     const [stats, setStats] = useState(null);
     const [complejos, setComplejos] = useState([]);
@@ -25,7 +27,7 @@ const Reportes = () => {
     const [filtroFechaFin, setFiltroFechaFin] = useState("");
     const [filtroEstado, setFiltroEstado] = useState("");
 
-    // Cargar complejos del admin
+    // Cargar complejos visibles según el rol (admin o super_admin)
     useEffect(() => {
         const cargarComplejos = async () => {
             try {
@@ -118,13 +120,13 @@ const Reportes = () => {
         }
 
         const csv = [
-            ["Fecha", "Hora", "Cancha", "Complejo", "Usuario ID", "Estado"],
+            ["Fecha", "Hora", "Cancha", "Complejo", "Usuario", "Estado"],
             ...reservas.map((r) => [
                 r.fecha,
                 r.hora,
                 r.cancha_nombre,
                 r.complejo_nombre,
-                r.user_id,
+                r.user?.username || r.user?.full_name || r.user_id,
                 r.estado,
             ]),
         ]
@@ -183,7 +185,9 @@ const Reportes = () => {
                 <div className="report-eyebrow">Panel administrativo</div>
                 <h1 className="display-5 fw-bold mb-2">Reportes de Reservas</h1>
                 <p className="fs-5 mb-0">
-                    Panel administrativo para gestionar reservas de tus complejos
+                    {isSuperAdmin
+                        ? "Panel global para visualizar reservas de todos los complejos"
+                        : "Panel administrativo para gestionar reservas de tus complejos"}
                 </p>
             </div>
 
@@ -428,7 +432,7 @@ const Reportes = () => {
                                         <th>Hora</th>
                                         <th>Cancha</th>
                                         <th>Complejo</th>
-                                        <th>Usuario ID</th>
+                                        <th>Usuario</th>
                                         <th>Estado</th>
                                     </tr>
                                 </thead>
@@ -448,7 +452,7 @@ const Reportes = () => {
                                             </td>
                                             <td>{r.complejo_nombre}</td>
                                             <td>
-                                                <code>{r.user_id}</code>
+                                                <strong>{r.user?.username || r.user?.full_name || "Usuario"}</strong>
                                             </td>
                                             <td>
                                                 <span className={`report-status-chip report-status-chip-dark ${getEstadoClase(r.estado)}`}>

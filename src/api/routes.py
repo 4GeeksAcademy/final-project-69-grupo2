@@ -252,7 +252,8 @@ def reset_password():
     if not frontend_url:
         return jsonify({"error": "Frontend URL is not configured"}), 500
 
-    reset_link = f"{frontend_url}reset-password?token={reset_token}"
+    reset_base_url = frontend_url.rstrip("/") + "/recovery-password"
+    reset_link = f"{reset_base_url}?token={reset_token}"
 
     subject = "Solicitud de restaurar la contraseña"
 
@@ -680,9 +681,10 @@ def delete_reserva(id):
 @jwt_required()
 def get_admin_reports():
     """
-    Obtiene un reporte de reservas para el admin.
-        Solo admins pueden acceder a este endpoint.
-        El admin solo ve reservas de sus propios complejos.
+    Obtiene un reporte de reservas para administración.
+        Solo admin y super_admin pueden acceder a este endpoint.
+        El admin ve reservas de sus complejos.
+        El super_admin ve reservas de todos los complejos.
 
         Query parameters:
         - complejo_id (int): Filtrar por ID de complejo
@@ -711,31 +713,38 @@ def get_admin_reports():
         fecha_fin = request.args.get("fecha_fin", type=str)
         estado = request.args.get("estado", type=str)
 
-        # Obtener los complejos del admin
-        admin_complejos = Complejo.query.filter_by(
-            owner_id=current_user.id).all()
-        admin_complejo_ids = [c.id for c in admin_complejos]
-
-        if not admin_complejo_ids:
-            return jsonify([]), 200  # Sin complejos, sin reservas
+        is_super_admin = current_user.role == Role.SUPER_ADMIN
 
         # Construir query base
         query = db.session.query(Reserva).join(Cancha).filter(
-            Cancha.complejo_id.in_(admin_complejo_ids),
             Reserva.es_bloqueo == False  # Excluir bloqueos
         )
 
+        # Si es admin normal, limitar a sus complejos
+        admin_complejo_ids = []
+        if not is_super_admin:
+            admin_complejos = Complejo.query.filter_by(
+                owner_id=current_user.id).all()
+            admin_complejo_ids = [c.id for c in admin_complejos]
+
+            if not admin_complejo_ids:
+                return jsonify([]), 200  # Sin complejos, sin reservas
+
+            query = query.filter(Cancha.complejo_id.in_(admin_complejo_ids))
+
         # Aplicar filtros
         if complejo_id:
-            # Verificar que el complejo pertenezca al admin
-            if complejo_id not in admin_complejo_ids:
+            # Verificar ownership solo para admin normal
+            if not is_super_admin and complejo_id not in admin_complejo_ids:
                 return jsonify({"error": "No tienes acceso a este complejo"}), 403
             query = query.filter(Cancha.complejo_id == complejo_id)
 
         if cancha_id:
-            # Verificar que la cancha pertenezca a uno de sus complejos
             cancha = Cancha.query.get(cancha_id)
-            if not cancha or cancha.complejo_id not in admin_complejo_ids:
+            if not cancha:
+                return jsonify({"error": "Cancha no encontrada"}), 404
+            # Verificar ownership solo para admin normal
+            if not is_super_admin and cancha.complejo_id not in admin_complejo_ids:
                 return jsonify({"error": "No tienes acceso a esta cancha"}), 403
             query = query.filter(Reserva.cancha_id == cancha_id)
 
@@ -769,8 +778,8 @@ def get_admin_reports():
 @jwt_required()
 def get_admin_statistics():
     """
-    Obtiene estadísticas de reservas para el admin.
-    Solo admins pueden acceder a este endpoint.
+    Obtiene estadísticas de reservas para administración.
+    Admin: solo sus complejos. Super admin: todos los complejos.
     """
     try:
         current_user_id = get_jwt_identity()
@@ -787,27 +796,30 @@ def get_admin_statistics():
         fecha_inicio = request.args.get("fecha_inicio", type=str)
         fecha_fin = request.args.get("fecha_fin", type=str)
 
-        # Obtener los complejos del admin
-        admin_complejos = Complejo.query.filter_by(
-            owner_id=current_user.id).all()
-        admin_complejo_ids = [c.id for c in admin_complejos]
-
-        if not admin_complejo_ids:
-            return jsonify({
-                "total_reservas": 0,
-                "confirmadas": 0,
-                "pendientes": 0,
-                "canceladas": 0,
-                "por_complejo": [],
-                "por_cancha": [],
-                "por_dia": []
-            }), 200
+        is_super_admin = current_user.role == Role.SUPER_ADMIN
 
         # Query base
         query = db.session.query(Reserva).join(Cancha).filter(
-            Cancha.complejo_id.in_(admin_complejo_ids),
             Reserva.es_bloqueo == False
         )
+
+        if not is_super_admin:
+            admin_complejos = Complejo.query.filter_by(
+                owner_id=current_user.id).all()
+            admin_complejo_ids = [c.id for c in admin_complejos]
+
+            if not admin_complejo_ids:
+                return jsonify({
+                    "total_reservas": 0,
+                    "confirmadas": 0,
+                    "pendientes": 0,
+                    "canceladas": 0,
+                    "por_complejo": [],
+                    "por_cancha": [],
+                    "por_dia": []
+                }), 200
+
+            query = query.filter(Cancha.complejo_id.in_(admin_complejo_ids))
 
         # Aplicar rango de fechas
         if fecha_inicio and fecha_fin:
@@ -845,7 +857,7 @@ def get_admin_statistics():
             cancha_nombre = r.cancha.nombre if r.cancha else "Sin cancha"
             if cancha_nombre not in por_cancha:
                 por_cancha[cancha_nombre] = {"total": 0, "confirmadas": 0}
-                por_cancha[cancha_nombre]["total"] += 1
+            por_cancha[cancha_nombre]["total"] += 1
             if r.estado == "confirmada":
                 por_cancha[cancha_nombre]["confirmadas"] += 1
 
@@ -855,7 +867,7 @@ def get_admin_statistics():
             fecha = r.fecha
             if fecha not in por_dia:
                 por_dia[fecha] = {"total": 0, "confirmadas": 0}
-                por_dia[fecha]["total"] += 1
+            por_dia[fecha]["total"] += 1
             if r.estado == "confirmada":
                 por_dia[fecha]["confirmadas"] += 1
 
@@ -877,7 +889,8 @@ def get_admin_statistics():
 @jwt_required()
 def get_admin_complejos():
     """
-    Obtiene los complejos que pertenecen al admin autenticado.
+    Obtiene complejos según el rol autenticado.
+    Admin: sus complejos. Super admin: todos los complejos.
     """
     try:
         current_user_id = get_jwt_identity()
@@ -890,12 +903,108 @@ def get_admin_complejos():
         if current_user.role not in [Role.ADMIN, Role.SUPER_ADMIN]:
             return jsonify({"error": "Acceso denegado"}), 403
 
-        complejos = Complejo.query.filter_by(
-            owner_id=current_user.id).all()
+        if current_user.role == Role.SUPER_ADMIN:
+            complejos = Complejo.query.all()
+        else:
+            complejos = Complejo.query.filter_by(
+                owner_id=current_user.id).all()
 
-        return jsonify([c.serialize() for c in complejos]), 200
+        complejos_con_canchas = []
+        for complejo in complejos:
+            complejo_data = complejo.serialize()
+            complejo_data["canchas"] = [
+                {"id": cancha.id, "nombre": cancha.nombre}
+                for cancha in complejo.canchas
+            ]
+            complejos_con_canchas.append(complejo_data)
+
+        return jsonify(complejos_con_canchas), 200
 
     except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@api.route('/admin/usuarios', methods=['GET'])
+@jwt_required()
+def get_admin_users():
+    """
+    Listado de usuarios para gestión del super_admin.
+    """
+    try:
+        current_user_id = get_jwt_identity()
+        current_user = User.query.get(int(current_user_id))
+
+        if not current_user:
+            return jsonify({"error": "Usuario no encontrado"}), 404
+
+        if current_user.role != Role.SUPER_ADMIN:
+            return jsonify({"error": "Acceso denegado. Solo super_admin"}), 403
+
+        users = User.query.order_by(User.create_at.desc()).all()
+        return jsonify([u.serialize() for u in users]), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@api.route('/admin/usuarios/<int:user_id>', methods=['PUT'])
+@jwt_required()
+def update_admin_user(user_id):
+    """
+    Permite al super_admin actualizar rol (admin/user) y estado activo.
+    """
+    try:
+        current_user_id = get_jwt_identity()
+        current_user = User.query.get(int(current_user_id))
+
+        if not current_user:
+            return jsonify({"error": "Usuario no encontrado"}), 404
+
+        if current_user.role != Role.SUPER_ADMIN:
+            return jsonify({"error": "Acceso denegado. Solo super_admin"}), 403
+
+        user = User.query.get(user_id)
+        if not user:
+            return jsonify({"error": "Usuario no encontrado"}), 404
+
+        data = request.get_json(silent=True) or {}
+        role_value = data.get("role", None)
+        is_active = data.get("is_active", None)
+
+        if role_value is None and is_active is None:
+            return jsonify({"error": "Debes enviar role o is_active"}), 400
+
+        if user.id == int(current_user_id):
+            return jsonify({"error": "No puedes modificar tu propio usuario desde este panel"}), 400
+
+        if user.role == Role.SUPER_ADMIN:
+            return jsonify({"error": "No se puede modificar otro super_admin"}), 400
+
+        if role_value is not None:
+            role_value = str(role_value).strip().lower()
+            if role_value not in [Role.ADMIN.value, Role.USER.value]:
+                return jsonify({"error": "Rol inválido. Usa admin o user"}), 400
+            user.role = Role(role_value)
+
+        if is_active is not None:
+            if isinstance(is_active, bool):
+                user.is_active = is_active
+            elif isinstance(is_active, str):
+                parsed = is_active.strip().lower()
+                if parsed in ["true", "1", "si", "sí"]:
+                    user.is_active = True
+                elif parsed in ["false", "0", "no"]:
+                    user.is_active = False
+                else:
+                    return jsonify({"error": "is_active inválido"}), 400
+            else:
+                return jsonify({"error": "is_active debe ser boolean"}), 400
+
+        db.session.commit()
+        return jsonify(user.serialize()), 200
+
+    except Exception as e:
+        db.session.rollback()
         return jsonify({"error": str(e)}), 500
 
 

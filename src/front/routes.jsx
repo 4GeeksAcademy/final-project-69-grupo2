@@ -24,6 +24,7 @@ import { UserReservas } from "./pages/UserReservas.jsx";
 import CanchasPorCategoria from "./pages/CanchasPorCategoria";
 import MisReservas from "./pages/MisReservas.jsx";
 import Reportes from "./pages/Reportes.jsx";
+import AdminUsuarios from "./pages/AdminUsuarios.jsx";
 import PagoExitoso from "./pages/PagoExitoso.jsx";
 import { ProtectedRoute } from "./components/ProtectedRoute.jsx";
 
@@ -48,6 +49,7 @@ export const router = createBrowserRouter(
                   <Route path="/reservas" element={<Reservas />} />
                   <Route path="/mis-reservas" element={<MisReservas />} />
                   <Route path="/reportes" element={<Reportes />} />
+                  <Route path="/admin/usuarios" element={<AdminUsuarios />} />
                   <Route path="/todos-complejos" element={<Complejos />} />
 
                   {/* Stripe Flow */}
@@ -58,6 +60,7 @@ export const router = createBrowserRouter(
                   <Route path="/login" element={<Login />} />
                   <Route path="/forgot-password" element={<ForgotPassword />} />
                   <Route path="/recovery-password" element={<RecoveryPassword />} />
+                  <Route path="/reset-password" element={<RecoveryPassword />} />
                   <Route path="/activate-account" element={<ActivateAccount />} />
                   <Route path="/reservar/:cancha_id" element={<ReservaCancha />} />
                   <Route path="/reservar/:canchaId" element={<ReservaCancha />} />
