@@ -1096,3 +1096,4 @@ def confirmar_pago():
         # Aquí imprimiremos el error exacto para que lo veas en la terminal
         print(f"DEBUG ERROR: {str(e)}")
         return jsonify({"success": False, "error": "Error interno del servidor"}), 500
+   
