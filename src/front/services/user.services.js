@@ -241,3 +241,54 @@ export const getAdminComplejos = async (token) => {
     throw error;
   }
 };
+
+export const getAdminUsuarios = async (token) => {
+  try {
+    const response = await fetch(`${API_URL}/api/admin/usuarios`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        result?.error || result?.message || "Failed to fetch admin users",
+      );
+    }
+
+    return result;
+  } catch (error) {
+    console.error("Error fetching admin users:", error);
+    throw error;
+  }
+};
+
+export const updateAdminUsuario = async (token, userId, payload) => {
+  try {
+    const response = await fetch(`${API_URL}/api/admin/usuarios/${userId}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        result?.error || result?.message || "Failed to update admin user",
+      );
+    }
+
+    return result;
+  } catch (error) {
+    console.error("Error updating admin user:", error);
+    throw error;
+  }
+};
