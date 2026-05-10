@@ -176,7 +176,7 @@
 // export default Canchas;
 
 
-// {cambios menores para mejorar agregar manejo de errores y optimizar filtros}
+
 import { useState, useEffect } from "react";
 import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 
@@ -306,6 +306,23 @@ const Canchas = () => {
                   <p className="text-muted small mb-1">
                     <i className="fa fa-building me-1"></i>{c.complejo_nombre || complejo?.nombre}
                   </p>
+
+                  {/* SECCIÓN DINÁMICA: GOOGLE MAPS */}
+                  {complejo?.google_map && (
+                    <div className="mb-2">
+                      <a 
+                        href={complejo.google_map} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="text-decoration-none small d-flex align-items-center"
+                        style={{ color: "#3B6D11", fontWeight: 500 }}
+                      >
+                        <i className="fa fa-map-marker-alt me-1 text-danger"></i>
+                        Ver ubicación en Maps
+                      </a>
+                    </div>
+                  )}
+
                   <div className="d-flex justify-content-between align-items-center mb-2">
                     <h5 className="card-title fw-bold mb-0">{c.nombre}</h5>
                     <span className="badge bg-light text-primary border">{c.categoria_nombre}</span>
