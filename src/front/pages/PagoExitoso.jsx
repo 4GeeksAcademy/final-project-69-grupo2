@@ -31,11 +31,11 @@ const PagoExitoso = () => {
                     Swal.fire({
                         icon: 'success',
                         title: '¡Pago Confirmado!',
-                        html: `Tu reserva en <b>${data.cancha}</b> ha sido procesada con éxito.`,
+                        html: `Tu reserva ha sido procesada con éxito.`,
                         confirmButtonColor: '#C8F135',
-                        confirmButtonText: 'Ver mis reservas',
+                        confirmButtonText: 'Ver mi registro de reservas',
                         allowOutsideClick: false,
-                    }).then(() => navigate("/reservas"));
+                    }).then(() => navigate("/reportes"));
                 } else {
                     throw new Error(data.error || "Error en el servidor");
                 }
@@ -47,7 +47,7 @@ const PagoExitoso = () => {
                     title: 'Verificación pendiente',
                     text: 'Tu pago fue procesado por Stripe pero no pudimos actualizar tu reserva automáticamente. La administración lo hará manualmente.',
                     confirmButtonText: 'Entendido',
-                }).then(() => navigate("/reservas"));
+                }).then(() => navigate("/reportes"));
             }
         };
 
