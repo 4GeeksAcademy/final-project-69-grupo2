@@ -14,14 +14,14 @@ export const AddComplejoDeportivo = () => {
     const [verFormulario, setVerFormulario] = useState(id ? true : false);
 
     const [complejo, setComplejo] = useState({
-        name: "", 
-        email: "", 
-        phone: "", 
-        address: "", 
-        country: "", 
-        city: "", 
-        google_map: "", 
-        image: null 
+        name: "",
+        email: "",
+        phone: "",
+        address: "",
+        country: "",
+        city: "",
+        google_map: "",
+        image: null
     });
 
     const backendUrl = import.meta.env.VITE_BACKEND_URL.replace(/\/$/, "");
@@ -60,7 +60,7 @@ export const AddComplejoDeportivo = () => {
                         country: data.country || "",
                         city: data.city || "",
                         google_map: data.google_map || "",
-                        image: null 
+                        image: null
                     });
                     setVerFormulario(true);
                 }
@@ -74,7 +74,7 @@ export const AddComplejoDeportivo = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        
+
         const url = id ? `${backendUrl}/api/complejo/${id}` : `${backendUrl}/api/complejo`;
         const method = id ? "PUT" : "POST";
 
@@ -86,7 +86,7 @@ export const AddComplejoDeportivo = () => {
         formData.append("country", complejo.country);
         formData.append("city", complejo.city);
         formData.append("google_map", complejo.google_map);
-        
+
         if (complejo.image && complejo.image[0]) {
             formData.append("image", complejo.image[0]);
         }
@@ -128,7 +128,7 @@ export const AddComplejoDeportivo = () => {
 
         if (result.isConfirmed) {
             try {
-                const resp = await fetch(`${backendUrl}/api/complejo/${idBorrar}`, { 
+                const resp = await fetch(`${backendUrl}/api/complejo/${idBorrar}`, {
                     method: "DELETE",
                     headers: { "Authorization": `Bearer ${token}` }
                 });
@@ -167,15 +167,15 @@ export const AddComplejoDeportivo = () => {
                             <label className="form-label fw-bold small">Nombre del Complejo</label>
                             <input className="form-control" value={complejo.name} onChange={e => setComplejo({ ...complejo, name: e.target.value })} required />
                         </div>
-                                                <div className="col-md-12">
+                        <div className="col-md-12">
                             <label className="form-label fw-bold small text-primary">
                                 <i className="fa fa-map-marker-alt me-1"></i> Link de Google Maps (URL)
                             </label>
-                            <input 
-                                className="form-control" 
-                                placeholder="https://goo.gl..." 
-                                value={complejo.google_map} 
-                                onChange={e => setComplejo({ ...complejo, google_map: e.target.value })} 
+                            <input
+                                className="form-control"
+                                placeholder="https://goo.gl..."
+                                value={complejo.google_map}
+                                onChange={e => setComplejo({ ...complejo, google_map: e.target.value })}
                             />
                             <div className="form-text">Pega aquí el enlace de "Compartir" de Google Maps.</div>
                         </div>
@@ -214,6 +214,16 @@ export const AddComplejoDeportivo = () => {
                             <label className="form-label fw-bold small">Teléfono</label>
                             <input className="form-control" value={complejo.phone} onChange={e => setComplejo({ ...complejo, phone: e.target.value })} required />
                         </div>
+                        <div className="col-md-4">
+                            <label className="form-label fw-bold small">Correo Electrónico</label>
+                            <input
+                                type="email"
+                                className="form-control"
+                                value={complejo.email}
+                                onChange={e => setComplejo({ ...complejo, email: e.target.value })}
+                                required
+                            />
+                        </div>
                         <div className="col-md-8">
                             <label className="form-label fw-bold small">Dirección</label>
                             <input className="form-control" value={complejo.address} onChange={e => setComplejo({ ...complejo, address: e.target.value })} required />
@@ -233,10 +243,10 @@ export const AddComplejoDeportivo = () => {
                 <div className="list-group shadow-sm">
                     {complejos.length > 0 ? (
                         complejos.map(item => (
-                            <ContactComplejoDeportivo 
-                                key={item.id} 
-                                complejo={item} 
-                                onDelete={() => borrarComplejo(item.id)} 
+                            <ContactComplejoDeportivo
+                                key={item.id}
+                                complejo={item}
+                                onDelete={() => borrarComplejo(item.id)}
                             />
                         ))
                     ) : (
