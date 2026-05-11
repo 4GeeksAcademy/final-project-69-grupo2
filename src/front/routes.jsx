@@ -1,30 +1,81 @@
-// Import necessary components and functions from react-router-dom.
 
 import {
-    createBrowserRouter,
-    createRoutesFromElements,
-    Route,
+      createBrowserRouter,
+      createRoutesFromElements,
+      Route,
 } from "react-router-dom";
 import { Layout } from "./pages/Layout";
-import { Home } from "./pages/Home";
+import Landing from "./pages/Landing";
+import Canchas from "./pages/Canchas";
 import { Single } from "./pages/Single";
 import { Demo } from "./pages/Demo";
+import { AddComplejoDeportivo } from "./pages/AddComplejoDeportivo.jsx";
+import ReservaCancha from "./pages/ReservaCancha";
+import { AddCancha } from "./pages/AddCancha.jsx";
+import Reservas from "./pages/Reservas";
+import Complejos from "./pages/Complejos";
+import { Register } from "./pages/Register";
+import { Login } from "./pages/Login";
+import { ForgotPassword } from "./pages/ForgotPassword";
+import { RecoveryPassword } from "./pages/RecoveryPassword";
+import { ActivateAccount } from "./pages/ActivationAccount";
+import { GestionHorarios } from "./pages/GestionHorarios.jsx";
+import { UserReservas } from "./pages/UserReservas.jsx";
+import CanchasPorCategoria from "./pages/CanchasPorCategoria";
+import MisReservas from "./pages/MisReservas.jsx";
+import Reportes from "./pages/Reportes.jsx";
+import AdminUsuarios from "./pages/AdminUsuarios.jsx";
+import PagoExitoso from "./pages/PagoExitoso.jsx";
+import { ProtectedRoute } from "./components/ProtectedRoute.jsx";
 
 export const router = createBrowserRouter(
-    createRoutesFromElements(
-    // CreateRoutesFromElements function allows you to build route elements declaratively.
-    // Create your routes here, if you want to keep the Navbar and Footer in all views, add your new routes inside the containing Route.
-    // Root, on the contrary, create a sister Route, if you have doubts, try it!
-    // Note: keep in mind that errorElement will be the default page when you don't get a route, customize that page to make your project more attractive.
-    // Note: The child paths of the Layout element replace the Outlet component with the elements contained in the "element" attribute of these child paths.
+      createRoutesFromElements(
+            <Route path="/" element={<Layout />}>
+                  <Route index element={<Landing />} />
 
-      // Root Route: All navigation will start from here.
-      <Route path="/" element={<Layout />} errorElement={<h1>Not found!</h1>} >
+                  {/* Complejos */}
+                  <Route path="/todos-complejos" element={<Complejos />} />
+                  <Route path="/complejos/:id" element={<Canchas />} />
+                  <Route path="/add-complejo" element={<AddComplejoDeportivo />} />
+                  <Route path="/add-complejo/:id" element={<AddComplejoDeportivo />} />
 
-        {/* Nested Routes: Defines sub-routes within the BaseHome component. */}
-        <Route path= "/" element={<Home />} />
-        <Route path="/single/:theId" element={ <Single />} />  {/* Dynamic route for single items */}
-        <Route path="/demo" element={<Demo />} />
-      </Route>
-    )
+                  {/* Canchas y Horarios */}
+                  <Route path="/complejo/:complejoId/add-cancha" element={<AddCancha />} />
+                  <Route path="/gestion-horarios/:canchaId" element={<GestionHorarios />} />
+
+                  {/* Reservas y Disponibilidad */}
+                  <Route path="/reservar/:canchaId" element={<ReservaCancha />} />
+                  <Route path="/ver-disponibilidad/:canchaId" element={<UserReservas />} />
+                  <Route path="/reservas" element={<Reservas />} />
+                  <Route path="/mis-reservas" element={<MisReservas />} />
+                  <Route path="/reportes" element={<Reportes />} />
+                  <Route path="/admin/usuarios" element={<AdminUsuarios />} />
+                  <Route path="/todos-complejos" element={<Complejos />} />
+
+                  {/* Stripe Flow */}
+                  <Route path="/pago-exitoso" element={<PagoExitoso />} />
+
+                  {/* Auth / Registro */}
+                  <Route path="/register" element={<Register />} />
+                  <Route path="/login" element={<Login />} />
+                  <Route path="/forgot-password" element={<ForgotPassword />} />
+                  <Route path="/recovery-password" element={<RecoveryPassword />} />
+                  <Route path="/reset-password" element={<RecoveryPassword />} />
+                  <Route path="/activate-account" element={<ActivateAccount />} />
+                  <Route path="/reservar/:cancha_id" element={<ReservaCancha />} />
+                  <Route path="/reservar/:canchaId" element={<ReservaCancha />} />
+                  <Route path="/reservas" element={<Reservas />} />
+                  <Route path="/ver-disponibilidad/:canchaId" element={<UserReservas />} />
+                  <Route path="/canchas-categoria" element={<CanchasPorCategoria />} />
+
+                  {/* Rutas Privadas del Usuario */}
+                  <Route element={<ProtectedRoute />}>
+                        <Route path="/mis-reservas" element={<UserReservas />} />
+                  </Route>
+
+                  {/* Otros */}
+                  <Route path="/single/:theId" element={<Single />} />
+                  <Route path="/demo" element={<Demo />} />
+            </Route>
+      )
 );
