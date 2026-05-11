@@ -1082,6 +1082,66 @@ def confirmar_pago():
             reserva.estado = "pagado"
             reserva.monto_pagado = session.amount_total / 100
             db.session.commit()
+
+            # 5. Enviar notificaciones por email (sin bloquear la confirmación de pago)
+            cancha = reserva.cancha
+            complejo = cancha.complejo if cancha else None
+            usuario = reserva.user
+            owner = complejo.owner if complejo else None
+
+            cancha_nombre = cancha.nombre if cancha else "Cancha no disponible"
+            complejo_nombre = complejo.nombre if complejo else "Complejo no disponible"
+
+            detalle_reserva_html = f"""
+                <ul>
+                    <li><strong>ID Reserva:</strong> {reserva.id}</li>
+                    <li><strong>Complejo:</strong> {complejo_nombre}</li>
+                    <li><strong>Cancha:</strong> {cancha_nombre}</li>
+                    <li><strong>Fecha:</strong> {reserva.fecha}</li>
+                    <li><strong>Hora:</strong> {reserva.hora}</li>
+                    <li><strong>Monto pagado:</strong> USD {reserva.monto_pagado:.2f}</li>
+                    <li><strong>Estado:</strong> {reserva.estado}</li>
+                </ul>
+            """
+
+            if usuario and usuario.email:
+                user_subject = "Reserva confirmada - Pago recibido"
+                user_body = f"""
+                    <div>
+                        <p>Hola {usuario.username},</p>
+                        <p>Tu reserva fue confirmada correctamente.</p>
+                        {detalle_reserva_html}
+                    </div>
+                """
+                sent_to_user = send_email(
+                    to=usuario.email,
+                    subject=user_subject,
+                    body=user_body
+                )
+                if not sent_to_user:
+                    print(
+                        f"Warning: no se pudo enviar email al usuario {usuario.email}")
+
+            if owner and owner.email:
+                owner_subject = "Nueva reserva confirmada en tu complejo"
+                owner_body = f"""
+                    <div>
+                        <p>Hola {owner.username},</p>
+                        <p>Se confirmó una nueva reserva en tu complejo.</p>
+                        {detalle_reserva_html}
+                        <p><strong>Usuario:</strong> {usuario.username if usuario else 'No disponible'}</p>
+                        <p><strong>Email usuario:</strong> {usuario.email if usuario else 'No disponible'}</p>
+                    </div>
+                """
+                sent_to_owner = send_email(
+                    to=owner.email,
+                    subject=owner_subject,
+                    body=owner_body
+                )
+                if not sent_to_owner:
+                    print(
+                        f"Warning: no se pudo enviar email al propietario {owner.email}")
+
             print(f"✅ ¡ÉXITO! Reserva {reserva_id} actualizada correctamente")
 
             return jsonify({
@@ -1096,4 +1156,3 @@ def confirmar_pago():
         # Aquí imprimiremos el error exacto para que lo veas en la terminal
         print(f"DEBUG ERROR: {str(e)}")
         return jsonify({"success": False, "error": "Error interno del servidor"}), 500
-   
