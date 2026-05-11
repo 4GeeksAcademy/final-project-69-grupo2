@@ -35,7 +35,7 @@ const PagoExitoso = () => {
                         confirmButtonColor: '#C8F135',
                         confirmButtonText: 'Ver mi registro de reservas',
                         allowOutsideClick: false,
-                    }).then(() => navigate("/reportes"));
+                    }).then(() => navigate("/mis-reservas"));
                 } else {
                     throw new Error(data.error || "Error en el servidor");
                 }
@@ -47,7 +47,7 @@ const PagoExitoso = () => {
                     title: 'Verificación pendiente',
                     text: 'Tu pago fue procesado por Stripe pero no pudimos actualizar tu reserva automáticamente. La administración lo hará manualmente.',
                     confirmButtonText: 'Entendido',
-                }).then(() => navigate("/reportes"));
+                }).then(() => navigate("/mis-reservas"));
             }
         };
 
