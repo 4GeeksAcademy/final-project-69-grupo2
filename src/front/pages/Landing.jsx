@@ -85,7 +85,7 @@
 //           <div className="d-flex gap-3">
 //             <button className="btn" style={{ background: "#C8F135", color: "#111", fontWeight: 600, padding: "12px 24px", borderRadius: "8px" }}
 //               onClick={() => navigate("/")}>VER COMPLEJOS →</button>
-            
+
 //           </div>
 //         </div>
 
@@ -266,15 +266,16 @@ const Landing = () => {
   const [categorias, setCategorias] = useState([]);
   const [indice, setIndice] = useState(0);
   const [heroIdx, setHeroIdx] = useState(0);
+  const [complejosLista, setComplejosLista] = useState([]);
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const categoria = searchParams.get("categoria");
-  
+
   const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 
   // Estado para imágenes dinámicas del Hero (usando tus fotos locales)
   const [heroImages, setHeroImages] = useState([
-    "https://unsplash.com" 
+    "https://unsplash.com"
   ]);
 
   useEffect(() => {
@@ -284,18 +285,31 @@ const Landing = () => {
 
     fetch(url)
       .then(r => r.json())
-      .then(data => { 
-        setComplejos(data); 
-        setIndice(0); 
+      .then(data => {
+        setComplejos(data);
+        setIndice(0);
+
+        // Filtrar complejos por categoría si existe
+        if (categoria) {
+          fetch(`${BACKEND_URL}/api/canchas?categoria=${categoria}`)
+            .then(r => r.json())
+            .then(canchas => {
+              const complejosIds = new Set(canchas.map(c => c.complejo_id));
+              const complejosConCanchas = data.filter(c => complejosIds.has(c.id));
+              setComplejosLista(complejosConCanchas);
+            });
+        } else {
+          setComplejosLista(data);
+        }
 
         if (data.length > 0) {
           const fotosDB = data
             .filter(c => c.imagen_url)
-            .map(c => c.imagen_url.startsWith('http') 
-              ? c.imagen_url 
+            .map(c => c.imagen_url.startsWith('http')
+              ? c.imagen_url
               : `${BACKEND_URL}/uploads/${c.imagen_url}`
             );
-          
+
           if (fotosDB.length > 0) setHeroImages(fotosDB);
         }
       });
@@ -310,12 +324,12 @@ const Landing = () => {
     return () => clearInterval(timer);
   }, [heroImages]);
 
-  const anterior = () => setIndice(i => (i === 0 ? complejos.length - 1 : i - 1));
-  const siguiente = () => setIndice(i => (i === complejos.length - 1 ? 0 : i + 1));
-  const visibles = complejos.slice(indice, indice + 3);
+  const anterior = () => setIndice(i => (i === 0 ? complejosLista.length - 1 : i - 1));
+  const siguiente = () => setIndice(i => (i === complejosLista.length - 1 ? 0 : i + 1));
+  const visibles = complejosLista.slice(indice, indice + 3);
 
   // Función para obtener imagen de complejo o fallback
-  const getImg = (url, i) => url 
+  const getImg = (url, i) => url
     ? (url.startsWith('http') ? url : `${BACKEND_URL}/uploads/${url}`)
     : `https://picsum.photos/seed/${i}comp/600/400`;
 
@@ -345,7 +359,7 @@ const Landing = () => {
             Disfruta de nuestras modernas instalaciones para pádel, tenis, fútbol y más.
           </p>
           <button className="btn" style={{ background: "#C8F135", color: "#111", fontWeight: 600, padding: "12px 24px", borderRadius: "8px" }}
-              onClick={() => navigate("/todos-complejos")}>VER COMPLEJOS →</button>
+            onClick={() => navigate("/todos-complejos")}>VER COMPLEJOS →</button>
         </div>
 
         <div style={{ position: "absolute", bottom: "20px", left: "50%", transform: "translateX(-50%)", display: "flex", gap: "8px", zIndex: 1 }}>
@@ -372,8 +386,8 @@ const Landing = () => {
                   <div className="card border-0 shadow-sm h-100" style={{ cursor: "pointer", borderRadius: "12px", overflow: "hidden" }} onClick={() => navigate(`/complejos/${complejo.id}`)}>
                     <img src={getImg(complejo.imagen_url, idx)} style={{ width: "100%", height: "200px", objectFit: "cover" }} alt={complejo.nombre} />
                     <div className="p-3">
-                        <h6 className="fw-bold mb-1">{complejo.nombre}</h6>
-                        <p className="text-muted small">📍 {complejo.city}</p>
+                      <h6 className="fw-bold mb-1">{complejo.nombre}</h6>
+                      <p className="text-muted small">📍 {complejo.city}</p>
                     </div>
                   </div>
                 </div>
@@ -406,9 +420,9 @@ const Landing = () => {
       </div>
 
       {/* BANNER FINAL DINÁMICO */}
-      <div style={{ 
+      <div style={{
         backgroundImage: `url(${heroImages[0]})`, // Usa la primera foto de tus complejos
-        backgroundSize: "cover", backgroundPosition: "center", position: "relative" 
+        backgroundSize: "cover", backgroundPosition: "center", position: "relative"
       }}>
         <div style={{ position: "absolute", inset: 0, background: "rgba(30,100,30,0.85)" }} />
         <div className="container py-5 d-flex justify-content-between align-items-center" style={{ position: "relative", zIndex: 1, color: "#fff" }}>

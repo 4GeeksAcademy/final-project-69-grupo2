@@ -15,8 +15,6 @@ from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identi
 from datetime import timedelta
 import cloudinary.uploader as cloudinary_upload
 import stripe
-import os
-
 
 # Configura tu clave secreta (está en tu Dashboard de Stripe)
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
